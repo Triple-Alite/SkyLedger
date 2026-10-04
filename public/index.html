@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SkyLedger — Flight Coordination Dashboard</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+<style>
+  :root { --navy:#0B1E3D; --navy-2:#132A52; --amber:#FFB020; --green:#2FA84F; --paper:#F7F9FC; --white:#FFFFFF; --steel:#5C6B85; --line:#E3E8F0; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--paper); color:var(--navy); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace; font-variant-numeric:tabular-nums; }
+  .brand-face { font-family:Georgia,"Times New Roman",Times,serif; }
+  button,select,input { font-family:inherit; }
+  button { cursor:pointer; }
+  :focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+  header { background:var(--navy); color:#fff; padding:16px 28px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand-mark { width:34px; height:34px; border-radius:50%; background:var(--amber); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .brand-mark svg { width:17px; height:17px; }
+  .brand-text h1 { font-size:19px; margin:0; font-weight:700; letter-spacing:.2px; line-height:1.2; }
+  .brand-text p { font-size:10.5px; margin:0; color:#93A6C6; letter-spacing:.5px; text-transform:uppercase; }
+  .header-right { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .header-action { background:transparent; color:#fff; border:1px solid #3E5588; border-radius:7px; padding:8px 11px; font-size:12px; font-weight:650; }
+  .header-action:hover { border-color:var(--amber); }
+  .account-controls { display:flex; align-items:center; gap:9px; color:#fff; font-size:12px; }
+  .account-controls[hidden],#new-corridor-btn[hidden],#personal-panel[hidden] { display:none; }
+  select#corridor-select { background:var(--navy-2); color:#fff; border:1px solid #24406e; border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; }
+  .live { display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700; letter-spacing:1px; color:var(--amber); }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--amber); }
+  .sync-status { font-size:10.5px; color:#93A6C6; }
+  @media (prefers-reduced-motion:no-preference) { .live-dot { animation:pulse-dot 1.8s ease-in-out infinite; } }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+  main { max-width:1040px; margin:0 auto; padding:24px 24px 56px; }
+  .toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+  .stats { font-size:13.5px; color:var(--steel); }
+  .stats strong { color:var(--navy); }
+  .toolbar-actions { display:flex; gap:14px; align-items:center; }
+  .btn-primary { background:var(--amber); color:var(--navy); border:none; border-radius:8px; padding:11px 18px; font-size:14px; font-weight:700; display:inline-flex; align-items:center; gap:8px; }
+  .btn-secondary { background:transparent; color:var(--steel); border:1px solid var(--line); border-radius:8px; padding:10px 16px; font-size:13px; font-weight:600; }
+  .btn-text { background:none; border:none; color:var(--steel); font-size:12px; text-decoration:underline; padding:4px; white-space:nowrap; }
+  .panel { background:var(--white); border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:20px; }
+  .panel h2 { font-size:15px; margin:0 0 3px; }
+  .panel .caption { font-size:12.5px; color:var(--steel); margin:0 0 18px; }
+  .grid-scroll { overflow-x:auto; }
+  .grid-inner { min-width:540px; }
+  .lane { display:flex; align-items:stretch; }
+  .lane-label { width:52px; flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; padding-right:12px; font-size:11.5px; color:var(--steel); font-weight:600; }
+  .lane-track { flex:1; position:relative; height:48px; border-bottom:1px solid var(--line); }
+  .lane:first-child .lane-track { border-top:1px solid var(--line); }
+  .bar { position:absolute; border-radius:7px; background:var(--navy-2); color:#fff; font-size:11.5px; font-weight:700; display:flex; align-items:center; padding:0 10px; white-space:nowrap; overflow:hidden; min-width:30px; cursor:default; }
+  @media (prefers-reduced-motion:no-preference) { .bar { transition:left .55s cubic-bezier(.4,0,.2,1),width .55s cubic-bezier(.4,0,.2,1),top .4s ease,height .4s ease,background .3s; } }
+  .bar.conflict { background:var(--amber); color:var(--navy); }
+  .bar.flash { animation:flash-conflict .9s ease-in-out 2; }
+  @keyframes flash-conflict { 0%,100%{box-shadow:0 0 0 0 rgba(255,176,32,0)} 50%{box-shadow:0 0 0 6px rgba(255,176,32,.35)} }
+  .axis { display:flex; margin-top:6px; }
+  .axis-spacer { width:52px; flex-shrink:0; }
+  .axis-track { flex:1; position:relative; height:16px; }
+  .axis-track span { position:absolute; font-size:10.5px; color:var(--steel); }
+  .empty { text-align:center; padding:36px 20px; }
+  .empty-icon { font-size:30px; margin-bottom:6px; }
+  .empty h3 { margin:8px 0 6px; font-size:15.5px; }
+  .empty p { margin:0 0 18px; color:var(--steel); font-size:13px; max-width:360px; margin-left:auto; margin-right:auto; }
+  .route-row { border:1px solid var(--line); border-radius:10px; padding:14px 44px 14px 16px; margin-bottom:10px; position:relative; }
+  .route-row.conflict { border-color:var(--amber); background:#FFFBF0; }
+  .route-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .status-dot { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .status-dot.clear { background:var(--green); }
+  .status-dot.conflict { background:var(--amber); }
+  .status-dot svg { width:11px; height:11px; stroke:#fff; }
+  .status-dot.conflict svg { stroke:var(--navy); }
+  .route-name { font-weight:700; font-size:14px; }
+  .route-operator { font-size:11.5px; color:var(--steel); font-weight:500; }
+  .payload-badge { display:inline-flex; align-items:center; gap:5px; background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:3px 10px 3px 6px; font-size:11px; font-weight:600; color:var(--navy); }
+  .payload-badge svg { width:12px; height:12px; }
+  .route-meta { font-size:12.5px; color:var(--steel); display:flex; gap:12px; flex-wrap:wrap; margin-left:auto; }
+  .clearance-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin-top:11px; padding-top:10px; border-top:1px solid var(--line); font-size:12px; color:var(--steel); }
+  .clearance-row strong { color:var(--navy); }
+  .clearance-action { margin-left:auto; }
+  .review-section { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+  .review-section h3 { font-size:13px; margin:0 0 8px; }
+  .review-current { color:var(--steel); font-size:12px; margin:0 0 12px; }
+  .review-buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .authority-caveat { color:var(--steel); font-size:11.5px; line-height:1.5; }
+  .conflict-detail { margin-top:10px; padding-top:10px; border-top:1px dashed #F0C878; font-size:13px; color:var(--navy); }
+  .conflict-detail strong { color:#8A5A00; }
+  .apply-btn { margin-top:9px; }
+  .context-banner { background:var(--navy-2); color:#fff; border-radius:12px; padding:14px 18px; margin-bottom:18px; font-size:13px; line-height:1.55; display:flex; gap:12px; align-items:flex-start; }
+  .context-banner .dot { width:6px; height:6px; border-radius:50%; background:var(--amber); margin-top:7px; flex-shrink:0; }
+  .context-banner strong { color:var(--amber); font-weight:700; }
+  .context-banner em { font-style:normal; text-decoration:underline; text-decoration-color:#3E5588; text-underline-offset:3px; }
+  .ncaa-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--steel); border:1px solid var(--line); border-radius:20px; padding:3px 10px 3px 7px; }
+  .ncaa-badge svg { width:11px; height:11px; }
+  .activity-row { display:flex; gap:14px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px; color:var(--navy); }
+  .activity-row:last-child { border-bottom:none; }
+  .activity-time { color:var(--steel); flex-shrink:0; width:66px; }
+  .personal-plan { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .personal-plan:last-child { border-bottom:none; }
+  .personal-plan-info { flex:1; min-width:0; }
+  .personal-plan-meta { color:var(--steel); font-size:12px; margin-top:3px; }
+  body.profile-view main > :not(#profile-view) { display:none; }
+  #profile-view[hidden],.profile-section[hidden] { display:none; }
+  .profile-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .profile-heading h2 { margin:2px 0 4px; font-size:22px; }
+  .profile-heading p { margin:0; color:var(--steel); font-size:13px; }
+  .profile-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; padding:14px 0 20px; border-bottom:1px solid var(--line); margin-bottom:18px; }
+  .profile-summary { min-width:0; }
+  .profile-summary span { display:block; color:var(--steel); font-size:11px; margin-bottom:5px; }
+  .profile-summary strong { display:block; overflow-wrap:anywhere; font-size:14px; }
+  .profile-details-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+  .profile-data-row { display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .profile-data-row:last-child { border-bottom:0; }
+  .profile-data-row span { color:var(--steel); }
+  .profile-data-row strong { text-align:right; overflow-wrap:anywhere; }
+  .profile-member-list { margin-top:12px; }
+  .profile-member { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .profile-member:last-child { border-bottom:0; }
+  .profile-member span,.profile-member small { color:var(--steel); }
+  .profile-member small { grid-column:1/-1; }
+  .profile-security-note { color:var(--steel); font-size:12px; line-height:1.5; }
+  .profile-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+  .danger-zone { border-color:#E7B7AF; }
+  .danger-zone .profile-security-note { max-width:680px; }
+  .btn-danger { background:#9F3024; color:#fff; border:0; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:700; }
+  .btn-danger:hover { background:#81271E; }
+  .delete-account-confirm { border-top:1px solid var(--line); margin-top:16px; padding-top:16px; }
+  .delete-account-confirm[hidden] { display:none; }
+  #profile-error { color:#8A3024; font-size:12px; }
+  #profile-status { color:#246C37; font-size:12px; }
+  .capacity-scroll { overflow-x:auto; }
+  .capacity-grid { min-width:920px; }
+  .capacity-row { display:grid; grid-template-columns:58px repeat(28,minmax(24px,1fr)); gap:3px; margin-bottom:4px; }
+  .capacity-label { display:flex; align-items:center; justify-content:flex-end; padding-right:7px; color:var(--steel); font-size:10.5px; font-weight:650; }
+  .capacity-time { color:var(--steel); text-align:center; font-size:9px; white-space:nowrap; }
+  .capacity-slot { height:22px; min-width:0; border:0; border-radius:4px; background:#E8F4EA; color:#246C37; padding:0; font-size:9px; }
+  .capacity-slot.busy { background:#FFF2D7; color:#8A5A00; }
+  .capacity-slot.conflict { background:#FFB020; color:var(--navy); font-weight:750; }
+  .capacity-slot.historical-delay { outline:2px dashed #C24A3A; outline-offset:-2px; }
+  .capacity-slot:disabled { cursor:default; }
+  .capacity-legend { display:flex; align-items:center; gap:16px; margin-top:11px; color:var(--steel); font-size:10.5px; }
+  .capacity-legend span { display:inline-flex; align-items:center; gap:5px; }
+  .capacity-swatch { width:10px; height:10px; border-radius:3px; background:#E8F4EA; }
+  .capacity-swatch.busy { background:#FFF2D7; }
+  .capacity-swatch.conflict { background:var(--amber); }
+  .proposal-section { border-top:1px solid var(--line); margin-top:18px; padding-top:16px; }
+  .proposal-section h3 { margin:0 0 8px; font-size:13px; }
+  .proposal-row { padding:11px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .proposal-row:last-child { border-bottom:0; }
+  .proposal-status { display:inline-block; margin-left:6px; color:var(--steel); font-size:10px; text-transform:capitalize; }
+  .proposal-actions { display:flex; gap:8px; margin-top:8px; }
+  .proposal-actions .btn-secondary { padding:7px 10px; }
+  .segment-control { display:inline-flex; padding:3px; gap:3px; border-radius:8px; background:var(--paper); margin:0 0 18px; }
+  .segment-control button { border:0; border-radius:6px; padding:8px 12px; background:transparent; color:var(--steel); font-size:12px; font-weight:650; }
+  .segment-control button.active { background:#fff; color:var(--navy); box-shadow:0 1px 3px rgba(11,30,61,.12); }
+  .account-modal { max-width:500px; padding:28px; border-radius:12px; }
+  .account-heading { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .account-mark { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; background:var(--amber); color:var(--navy); }
+  .account-mark svg { width:18px; height:18px; }
+  .account-eyebrow { margin:0 0 3px; color:var(--steel); font-size:10px; font-weight:750; letter-spacing:.7px; text-transform:uppercase; }
+  .account-heading h2 { margin:0; font-size:19px; }
+  .password-wrap { position:relative; }
+  .password-wrap input { padding-right:46px; }
+  .password-toggle { position:absolute; top:50%; right:6px; transform:translateY(-50%); width:34px; height:34px; border:0; border-radius:6px; display:flex; align-items:center; justify-content:center; background:transparent; color:var(--steel); }
+  .password-toggle:hover { background:var(--paper); color:var(--navy); }
+  .password-toggle svg { width:18px; height:18px; }
+  .account-hint { color:var(--steel); font-size:11px; margin:6px 0 0; }
+  .account-error { border:1px solid #F0C7BF; border-radius:7px; background:#FFF5F2; color:#8A3024; padding:9px 11px; margin:0 0 12px; font-size:12px; }
+  .account-error[hidden] { display:none; }
+  .account-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:18px; }
+  .account-actions .btn-primary { min-width:150px; justify-content:center; }
+  .map-canvas { min-height:340px; width:100%; border:1px solid var(--line); border-radius:8px; background:#E8EDF2; z-index:0; }
+  .map-draft { min-height:280px; }
+  .map-hint { color:var(--steel); font-size:12px; margin:0 0 8px; }
+  .waypoint-tools { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:8px; color:var(--steel); font-size:11px; }
+  .waypoint-entry { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+  .waypoint-entry input { min-width:0; padding:8px 9px; border:1px solid var(--line); border-radius:7px; color:var(--navy); }
+  .waypoint-entry button { white-space:nowrap; }
+  .place-lookup { margin-top:6px; }
+  .place-results { display:grid; gap:4px; margin-top:6px; }
+  .place-results[hidden] { display:none; }
+  .place-result { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--navy); text-align:left; font-size:12px; }
+  .place-result:hover { border-color:var(--amber); background:#FFFBF0; }
+  .place-coordinate-status { display:block; min-height:14px; margin-top:4px; color:var(--steel); font-size:10.5px; }
+  .ncaa-note { font-size:10px; color:var(--steel); margin-left:6px; }
+  .field textarea { width:100%; min-height:74px; resize:vertical; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:14px; color:var(--navy); }
+  .fleet-record { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .fleet-record:last-child { border-bottom:0; }
+  .readiness-note { margin:7px 0 0; padding:8px 10px; border-radius:6px; background:#FFF4DC; color:#775000; font-size:11px; }
+  .readiness-note[hidden] { display:none; }
+  .team-entry,.notification-entry,.review-entry { padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .team-entry:last-child,.notification-entry:last-child,.review-entry:last-child { border-bottom:0; }
+  .team-entry-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .team-entry select { border:1px solid var(--line); border-radius:6px; padding:5px; color:var(--navy); }
+  .invite-link-box { padding:10px; border:1px solid var(--line); border-radius:7px; background:var(--paper); overflow-wrap:anywhere; font-size:11px; }
+  .notification-entry.unread { border-left:3px solid var(--amber); padding-left:10px; }
+  .notification-meta { color:var(--steel); font-size:10px; margin-top:3px; }
+  .reliability-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .reliability-value { display:block; font-size:20px; font-weight:750; color:var(--navy); }
+  .reliability-label { color:var(--steel); font-size:11px; }
+  .map-context { display:grid; grid-template-columns:1fr; gap:8px; margin-top:14px; font-size:12px; }
+  .weather-context { padding:10px 12px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--navy); }
+  .airspace-context { color:var(--steel); font-size:11px; }
+  .airspace-list { display:flex; flex-wrap:wrap; gap:8px; }
+  .airspace-chip { border:1px solid var(--line); border-radius:7px; padding:5px 8px; color:var(--navy); font-size:10px; background:#fff; }
+  .schedule-date { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin:0 0 10px; font-size:11px; color:var(--steel); }
+  .schedule-date input { border:1px solid var(--line); border-radius:6px; padding:6px 8px; color:var(--navy); font:inherit; }
+  @media (max-width:640px) { .reliability-grid { grid-template-columns:1fr; gap:9px; } }
+  .cancel-x { position:absolute; top:10px; right:10px; width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:var(--steel); display:flex; align-items:center; justify-content:center; }
+  .cancel-x:hover { background:var(--line); color:var(--navy); }
+  .cancel-x svg { width:13px; height:13px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:60; background:var(--navy); color:#fff; padding:12px 20px; border-radius:10px; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:10px; box-shadow:0 10px 28px rgba(11,30,61,.35); max-width:90vw; }
+  .toast.conflict-toast { background:var(--amber); color:var(--navy); }
+  .toast.hidden { display:none; }
+  .toast-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  @media (prefers-reduced-motion:no-preference) { .toast { animation:toast-in .3s ease; } }
+  @keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+  .modal-overlay { position:fixed; inset:0; background:rgba(11,30,61,.55); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .modal-overlay.hidden { display:none; }
+  .modal { background:#fff; border-radius:16px; padding:26px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+  .modal h2 { margin:0 0 4px; font-size:18px; }
+  .modal .sub { font-size:13px; color:var(--steel); margin:0 0 20px; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:12.5px; font-weight:700; margin-bottom:6px; color:var(--navy); }
+  .field input,.field select { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; color:var(--navy); background:#fff; }
+  .field-row { display:flex; gap:12px; }
+  .field-row .field { flex:1; min-width:0; }
+  .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+  footer.site-footer { display:flex; align-items:center; justify-content:space-between; gap:12px 24px; flex-wrap:wrap; padding:16px 24px 24px; border-top:1px solid var(--line); color:var(--steel); font-size:11.5px; }
+  .footer-brand { color:var(--navy); font-weight:700; white-space:nowrap; }
+  .footer-brand span { margin-left:8px; color:var(--steel); font-weight:400; }
+  .footer-note { margin:0; max-width:560px; }
+  .footer-health { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  .footer-health strong { color:var(--navy); font-weight:650; }
+  .footer-dot { width:7px; height:7px; border-radius:50%; background:var(--steel); }
+  .footer-health[data-state="operational"] .footer-dot { background:var(--green); }
+  .footer-health[data-state="offline"] .footer-dot,.footer-health[data-state="degraded"] .footer-dot { background:#C74B35; }
+  @media (max-width:640px) {
+    header { padding:14px 16px; }
+    main { padding:18px 14px 44px; }
+    .toolbar { flex-direction:column; align-items:stretch; }
+    .toolbar-actions { justify-content:space-between; }
+    .btn-primary { flex:1; justify-content:center; }
+    .route-meta { margin-left:0; width:100%; }
+    .profile-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .profile-details-grid { grid-template-columns:1fr; }
+    .profile-heading { align-items:center; }
+    footer.site-footer { align-items:flex-start; flex-direction:column; padding:14px 16px 22px; }
+    .footer-note { max-width:none; }
+    .field-row { flex-direction:column; gap:14px; }
+    .map-canvas { min-height:280px; }
+    .waypoint-entry { grid-template-columns:1fr 1fr; }
+    .waypoint-entry button { grid-column:1 / -1; }
+    .context-banner { font-size:12.5px; }
+    .toast { left:14px; right:14px; transform:none; max-width:none; }
+  }
+  @media (prefers-reduced-motion:no-preference) and (max-width:640px) {
+    @keyframes toast-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1E3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
+      <div class="brand-text"><h1 class="brand-face">SkyLedger</h1><p>Flight Coordination</p></div>
+    </div>
+    <div class="header-right">
+      <select id="corridor-select" aria-label="Select corridor"></select>
+      <button id="new-corridor-btn" class="header-action" type="button" hidden>+ Add location</button>
+      <button id="delete-corridor-btn" class="header-action" type="button" hidden>Delete location</button>
+      <div class="live"><span class="live-dot"></span>LIVE</div>
+      <span class="sync-status" id="sync-status">Connecting…</span>
+      <button id="team-btn" class="header-action" type="button" hidden>Team</button>
+      <button id="notifications-btn" class="header-action" type="button" hidden>Alerts</button>
+      <button id="airspace-review-btn" class="header-action" type="button" hidden>Review airspace</button>
+      <button id="profile-nav-btn" class="header-action" type="button" hidden>Profile</button>
+      <button id="sign-in-btn" class="header-action" type="button">Sign in</button>
+      <div id="account-controls" class="account-controls" hidden><span id="account-name"></span></div>
+    </div>
+  </header>
+  <main>
+    <section id="profile-view" hidden>
+      <div class="profile-heading">
+        <div><p class="account-eyebrow">Organization account</p><h2>Profile &amp; settings</h2><p>People, account details, and organization settings.</p></div>
+        <button id="profile-back-btn" class="btn-secondary" type="button">Back to schedule</button>
+      </div>
+      <div class="segment-control" id="profile-tabs" role="tablist" aria-label="Profile sections"><button type="button" class="active" data-profile-tab="overview" role="tab">Overview</button><button type="button" data-profile-tab="settings" role="tab">Settings</button></div>
+      <p id="profile-error" class="account-error" role="alert" hidden></p>
+      <div id="profile-overview" class="profile-section">
+        <div class="profile-summary-grid">
+          <div class="profile-summary"><span>Organization</span><strong id="profile-org-summary">—</strong></div>
+          <div class="profile-summary"><span>Primary contact</span><strong id="profile-owner-summary">—</strong></div>
+          <div class="profile-summary"><span>Active members</span><strong id="profile-members-summary">—</strong></div>
+          <div class="profile-summary"><span>Shared locations</span><strong id="profile-locations-summary">—</strong></div>
+        </div>
+        <div class="profile-details-grid">
+          <section class="panel">
+            <h2>Pilot profile</h2>
+            <div class="profile-data-row"><span>Pilot name</span><strong id="profile-pilot-name">—</strong></div>
+            <div class="profile-data-row"><span>Login email</span><strong id="profile-pilot-email">—</strong></div>
+            <div class="profile-data-row"><span>Email status</span><strong id="profile-email-status">—</strong></div>
+            <div class="profile-data-row"><span>Organization role</span><strong id="profile-role">—</strong></div>
+            <div class="profile-data-row"><span>Member since</span><strong id="profile-member-since">—</strong></div>
+          </section>
+          <section class="panel">
+            <h2>Organization &amp; pilots</h2>
+            <div class="profile-data-row"><span>Organization created</span><strong id="profile-org-created">—</strong></div>
+            <div class="profile-data-row"><span>Owner contact</span><strong id="profile-owner-contact">—</strong></div>
+            <div id="profile-member-list" class="profile-member-list"></div>
+          </section>
+        </div>
+      </div>
+      <div id="profile-settings" class="profile-section" hidden>
+        <section class="panel">
+          <h2>Profile settings</h2><p class="caption">Update your pilot name and organization details.</p>
+          <form id="profile-form">
+            <div class="field"><label for="profile-name-input">Pilot name</label><input id="profile-name-input" type="text" maxlength="80" autocomplete="name" required></div>
+            <div class="field"><label for="profile-org-input">Organization name</label><input id="profile-org-input" type="text" maxlength="100" autocomplete="organization" required><p class="account-hint" id="profile-org-hint">Only organization owners and admins can edit this name.</p></div>
+            <div class="field"><label for="profile-email-input">Login email</label><input id="profile-email-input" type="email" readonly><p class="account-hint">Email changes require a verified-address workflow and are not editable here.</p></div>
+            <p id="profile-form-error" class="account-error" role="alert" hidden></p>
+            <p id="profile-status" hidden></p>
+            <div class="modal-actions"><button type="submit" class="btn-primary" id="profile-save-btn">Save settings</button></div>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>Account security</h2>
+          <p class="profile-security-note" id="profile-security-note"></p>
+          <div class="profile-actions"><button type="button" class="btn-secondary" id="profile-reset-password-btn">Send password reset link</button><button id="sign-out-btn" class="btn-secondary" type="button">Sign out</button></div>
+        </section>
+        <section class="panel danger-zone">
+          <h2>Delete account</h2>
+          <p class="profile-security-note">Deleting disables your sign-in and anonymizes your account details. Historical flight plans remain in the organization ledger. Organization owners must transfer ownership to an active teammate before deleting their account.</p>
+          <button type="button" class="btn-danger" id="delete-account-open-btn">Delete account</button>
+          <form id="delete-account-form" class="delete-account-confirm" hidden>
+            <div class="field"><label for="delete-account-password">Current password</label><input id="delete-account-password" type="password" autocomplete="current-password" required></div>
+            <div class="field" id="delete-transfer-wrap" hidden><label for="delete-transfer-select">Transfer organization ownership to</label><select id="delete-transfer-select"></select></div>
+            <p id="delete-account-error" class="account-error" role="alert" hidden></p>
+            <div class="profile-actions"><button type="button" class="btn-secondary" id="delete-account-cancel-btn">Cancel</button><button type="submit" class="btn-danger" id="delete-account-submit-btn">Permanently delete account</button></div>
+          </form>
+        </section>
+      </div>
+    </section>
+    <div class="context-banner"><span class="dot"></span><span>Nigeria's drone medical delivery network already reaches <strong>13M+ people</strong> across three states, and keeps expanding. NCAA's registration portal confirms <em>who</em> can fly — SkyLedger is where operators confirm <em>when and where</em>, so shared corridors stay conflict-free.</span></div>
+    <div class="toolbar">
+      <div class="stats" id="stats"></div>
+      <div class="toolbar-actions">
+        <button class="btn-text" id="reset-btn" type="button">&#8634; Reset demo data</button>
+        <button class="btn-primary" id="open-modal-btn" type="button">+ New Flight Plan</button>
+      </div>
+    </div>
+    <section class="panel">
+      <h2>Corridor traffic</h2>
+      <p class="caption">Each bar is a registered flight plan. Same altitude band, overlapping time — that's a conflict.</p>
+      <label class="schedule-date" for="schedule-date">Flight date <input id="schedule-date" type="date"></label>
+      <div class="grid-scroll"><div class="grid-inner" id="grid-inner"></div></div>
+    </section>
+    <section class="panel">
+      <h2>Flight paths</h2>
+      <p class="caption">Dated paths are checked for the same altitude band and time-aligned positions within 100 m. Conflict checks are advisory; team approval and authority decisions are tracked separately.</p>
+      <div class="map-canvas" id="corridor-map" role="region" aria-label="Corridor flight paths map"></div>
+      <div class="map-context"><div class="weather-context" id="weather-context">Weather context is loading…</div><p class="airspace-context">Sourced overlays are reviewed by configured reviewers but are not flight clearance. Check current authority publications before flight.</p><div class="airspace-list" id="airspace-list"></div><button class="btn-secondary" id="add-airspace-btn" type="button" hidden>Add sourced airspace overlay</button></div>
+    </section>
+    <section class="panel">
+      <h2>Corridor capacity</h2>
+      <p class="caption">30-minute availability by altitude band, 06:00–20:00.</p>
+      <div class="capacity-scroll"><div class="capacity-grid" id="capacity-grid"></div></div>
+      <div class="capacity-legend"><span><i class="capacity-swatch"></i>Open</span><span><i class="capacity-swatch busy"></i>Scheduled</span><span><i class="capacity-swatch conflict"></i>Conflict</span><span>Dashed outline: reported departure delays</span></div>
+    </section>
+    <section class="panel">
+      <h2>Flight plans</h2><p class="caption" id="list-caption"></p><div id="route-list"></div>
+    </section>
+    <section class="panel">
+      <h2>Corridor reliability</h2><p class="caption">Based on operator-reported flight outcomes. Planning context only.</p><div id="reliability-metrics"></div>
+    </section>
+    <section class="panel" id="personal-panel" hidden>
+      <h2>My flight plans</h2><p class="caption">Your schedules across every corridor.</p><div id="personal-plan-list"></div>
+      <div class="proposal-section"><h3>Coordination proposals</h3><div id="proposal-list"></div></div>
+    </section>
+    <section class="panel" id="offline-draft-panel" hidden>
+      <h2>Pending offline plans</h2><p class="caption">Saved on this device. They will sync when the connection returns.</p><div id="offline-draft-list"></div>
+    </section>
+    <section class="panel">
+      <h2>Activity ledger</h2><p class="caption" id="activity-caption"></p><div id="activity-list"></div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-brand">SkyLedger <span>Flight coordination</span></div>
+    <p class="footer-note">Planning support only. Confirm current aviation and airspace approvals with the relevant authorities before flight.</p>
+    <div class="footer-health" id="footer-health" data-state="checking" role="status" aria-live="polite"><span class="footer-dot" aria-hidden="true"></span><span>Service status:</span><strong id="footer-service-status">Checking</strong></div>
+  </footer>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">New Flight Plan</h2><p class="sub">Submitted into <strong id="modal-corridor-name"></strong></p>
+      <form id="flight-form">
+        <div class="field"><label for="f-operator">Operator</label><input id="f-operator" type="text" placeholder="e.g. Zenith Health Logistics" required></div>
+        <div class="field"><label for="f-ncaa">NCAA registration ID <span style="font-weight:400;color:var(--steel);">(optional)</span></label><input id="f-ncaa" type="text" placeholder="e.g. NCAA-RPAS-0099"></div>
+        <div class="field-row">
+          <div class="field"><label for="f-from">From</label><input id="f-from" type="text" placeholder="Kaduna Hub" required><div class="place-lookup"><button type="button" class="btn-text" id="f-from-search">Find place coordinates</button><div class="place-results" id="f-from-results" hidden></div><span class="place-coordinate-status" id="f-from-coordinate-status" aria-live="polite"></span></div></div>
+          <div class="field"><label for="f-to">To</label><input id="f-to" type="text" placeholder="Giwa Clinic" required><div class="place-lookup"><button type="button" class="btn-text" id="f-to-search">Find place coordinates</button><div class="place-results" id="f-to-results" hidden></div><span class="place-coordinate-status" id="f-to-coordinate-status" aria-live="polite"></span></div></div>
+        </div>
+        <div class="field"><label for="f-date">Flight date</label><input id="f-date" type="date" required></div>
+        <div class="field"><label>Route waypoints</label><p class="map-hint">Click the map or enter coordinates to add route points in order.</p><div class="map-canvas map-draft" id="flight-map" role="region" aria-label="Click map to add route waypoints"></div><div class="waypoint-entry"><label>Latitude<input id="waypoint-lat" type="number" min="-90" max="90" step="any" placeholder="e.g. 9.08"></label><label>Longitude<input id="waypoint-lng" type="number" min="-180" max="180" step="any" placeholder="e.g. 8.67"></label><button type="button" class="btn-secondary" id="add-waypoint-btn">Add coordinates</button><button type="button" class="btn-secondary" id="use-device-location-btn" title="Request device location and add it as a waypoint">Use my location</button></div><div class="waypoint-tools"><span id="waypoint-count">No waypoints selected</span><button type="button" class="btn-text" id="clear-waypoints-btn">Clear route</button></div></div>
+        <div class="field"><label for="f-aircraft">Aircraft</label><select id="f-aircraft"><option value="">No saved aircraft</option></select><button type="button" class="btn-text" id="manage-aircraft-btn">Manage fleet</button><p class="readiness-note" id="endurance-warning" hidden></p></div>
+        <div class="field"><label for="f-payload">Payload type</label><select id="f-payload"><option value="medical">Medical Delivery</option><option value="agriculture">Agriculture</option><option value="security">Security &amp; Surveillance</option><option value="cargo">Cargo &amp; Logistics</option></select></div>
+        <div class="field"><label for="f-payload-details">Payload details</label><input id="f-payload-details" type="text" maxlength="200" placeholder="Contents, weight, or handling notes"></div>
+        <div class="field-row">
+          <div class="field"><label for="f-battery-start">Battery at launch (%)</label><input id="f-battery-start" type="number" min="0" max="100" step="1" placeholder="Optional"></div>
+          <div class="field"><label for="f-battery-reserve">Planned reserve (%)</label><input id="f-battery-reserve" type="number" min="0" max="100" step="1" placeholder="Optional"></div>
+        </div>
+        <div class="field"><label for="f-contingency">Contingency plan</label><textarea id="f-contingency" maxlength="500" placeholder="Alternate landing point, return route, or hold plan"></textarea></div>
+        <div class="field-row">
+          <div class="field"><label for="f-band">Altitude band</label><select id="f-band"><option>200ft</option><option>300ft</option><option>400ft</option><option selected>500ft</option></select></div>
+          <div class="field"><label for="f-start">Start time</label><input id="f-start" type="time" value="10:00" required></div>
+          <div class="field"><label for="f-end">End time</label><input id="f-end" type="time" value="10:30" required></div>
+        </div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="cancel-btn">Cancel</button><button type="submit" class="btn-primary">Submit Flight Plan</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="account-modal-overlay">
+    <div class="modal account-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+      <div class="account-heading"><div class="account-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div><div><p class="account-eyebrow">Operator account</p><h2 id="account-modal-title">Sign in to SkyLedger</h2></div></div>
+      <p class="sub" id="account-modal-sub">Access your flight plans from any device.</p>
+      <p class="account-hint" id="invite-context" hidden></p>
+      <div class="segment-control" id="account-mode-control" role="tablist" aria-label="Account action"><button id="login-mode-btn" class="active" type="button" role="tab">Sign in</button><button id="signup-mode-btn" type="button" role="tab">Create account</button></div>
+      <form id="account-form">
+        <div class="field" id="account-organization-field" hidden><label for="account-organization">Organization name</label><input id="account-organization" type="text" autocomplete="organization" maxlength="100" placeholder="e.g. Northstar Air"></div>
+        <div class="field" id="account-name-field" hidden><label for="account-name-input">Plan contact name</label><input id="account-name-input" type="text" autocomplete="name" maxlength="80" placeholder="e.g. Ada Pilot"></div>
+        <div class="field" id="account-email-field"><label for="account-email">Email</label><input id="account-email" type="email" autocomplete="email" maxlength="254" required></div>
+        <div class="field" id="account-verification-code-field" hidden><label for="account-verification-code">Six-digit verification code</label><input id="account-verification-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000"></div>
+        <button type="button" class="btn-text" id="email-verification-resend" hidden>Resend verification code</button>
+        <div class="field" id="account-password-field"><label for="account-password">Password</label><div class="password-wrap"><input id="account-password" type="password" autocomplete="current-password" minlength="8" required><button class="password-toggle" type="button" id="password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div><p class="account-hint" id="password-hint" hidden>Use at least 8 characters.</p></div>
+        <div class="field" id="account-password-confirm-field" hidden><label for="account-password-confirm">Confirm new password</label><div class="password-wrap"><input id="account-password-confirm" type="password" autocomplete="new-password" minlength="8"><button class="password-toggle" type="button" id="password-confirm-toggle" aria-label="Show new password" aria-pressed="false" title="Show new password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <button type="button" class="btn-text" id="forgot-password-btn">Forgot password?</button>
+        <p class="account-hint" id="account-reset-status" hidden></p>
+        <p class="account-error" id="account-form-error" role="alert" hidden></p>
+        <div class="account-actions"><button type="button" class="btn-secondary" id="account-cancel-btn">Cancel</button><button type="submit" class="btn-primary" id="account-submit-btn">Sign in</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="corridor-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="corridor-modal-title">
+      <h2 id="corridor-modal-title">Add a location</h2><p class="sub">Create a shared location for flight-plan coordination.</p>
+      <form id="corridor-form">
+        <div class="field"><label for="corridor-label-input">Location name</label><input id="corridor-label-input" type="text" placeholder="e.g. Lagos — Lekki" minlength="3" maxlength="80" required></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="corridor-cancel-btn">Cancel</button><button type="submit" class="btn-primary">Create location</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="fleet-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fleet-modal-title">
+      <h2 id="fleet-modal-title">My aircraft</h2><p class="sub">Save aircraft details to reuse them in flight plans.</p>
+      <div id="fleet-list"></div>
+      <form id="fleet-form">
+        <div class="field"><label for="aircraft-name">Aircraft name</label><input id="aircraft-name" type="text" maxlength="80" placeholder="e.g. Kestrel 2" required></div>
+        <div class="field-row"><div class="field"><label for="aircraft-manufacturer">Manufacturer</label><input id="aircraft-manufacturer" type="text" maxlength="80"></div><div class="field"><label for="aircraft-model">Model</label><input id="aircraft-model" type="text" maxlength="80"></div></div>
+        <div class="field-row"><div class="field"><label for="aircraft-registration">Registration (optional)</label><input id="aircraft-registration" type="text" maxlength="40"></div><div class="field"><label for="aircraft-endurance">Maximum endurance (minutes)</label><input id="aircraft-endurance" type="number" min="1" max="1440" step="1" required></div></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="fleet-close-btn">Close</button><button type="submit" class="btn-primary">Save aircraft</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="feedback-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+      <h2 id="feedback-modal-title">Post-flight report</h2><p class="sub" id="feedback-modal-sub"></p>
+      <form id="feedback-form">
+        <div class="field-row"><div class="field"><label for="actual-start">Actual departure</label><input id="actual-start" type="time" required></div><div class="field"><label for="actual-end">Actual arrival</label><input id="actual-end" type="time" required></div></div>
+        <div class="field"><label for="flight-disruption">Disruption</label><select id="flight-disruption"><option value="none">None</option><option value="weather">Weather</option><option value="technical">Technical</option><option value="airspace">Airspace</option><option value="delay">Delay</option><option value="other">Other</option></select></div>
+        <div class="field"><label for="outcome-notes">Notes</label><textarea id="outcome-notes" maxlength="500" placeholder="Optional operational notes"></textarea></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="feedback-cancel-btn">Cancel</button><button type="submit" class="btn-primary">Save report</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="airspace-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="airspace-modal-title">
+      <h2 id="airspace-modal-title">Add airspace context</h2><p class="sub">Imported overlays are community-supplied and not verified by SkyLedger.</p>
+      <form id="airspace-form">
+        <div class="field"><label for="airspace-name">Location name</label><input id="airspace-name" type="text" maxlength="100" required></div>
+        <div class="field"><label for="airspace-category">Category</label><select id="airspace-category"><option value="restricted">Restricted</option><option value="no-fly">No-fly</option><option value="caution">Caution</option></select></div>
+        <div class="field-row"><div class="field"><label for="airspace-source">Source name</label><input id="airspace-source" type="text" maxlength="120" required></div><div class="field"><label for="airspace-date">Source checked</label><input id="airspace-date" type="date" required></div></div>
+        <div class="field"><label for="airspace-url">Source URL</label><input id="airspace-url" type="url" placeholder="https://…" required></div>
+        <div class="field"><label for="airspace-geojson">GeoJSON polygon</label><textarea id="airspace-geojson" maxlength="12000" placeholder='{"type":"Polygon","coordinates":[[[7,9],[7.1,9],[7.1,9.1],[7,9.1],[7,9]]]}' required></textarea></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="airspace-cancel-btn">Cancel</button><button type="submit" class="btn-primary">Add overlay</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="team-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="team-modal-title">
+      <h2 id="team-modal-title">Organization team</h2><p class="sub">Manage member roles and invitations.</p>
+      <div id="team-member-list"></div>
+      <form id="team-invite-form">
+        <div class="field"><label for="invite-email">Invite by email</label><input id="invite-email" type="email" maxlength="254" required></div>
+        <div class="field"><label for="invite-role">Role</label><select id="invite-role"><option value="dispatcher">Dispatcher</option><option value="pilot">Pilot</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div>
+        <p class="account-error" id="invite-error" role="alert" hidden></p>
+        <div class="field" id="invite-link-wrap" hidden><label>Share this invitation link</label><div id="invite-link" class="invite-link-box"></div></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="team-close-btn">Close</button><button type="submit" class="btn-primary">Send invite</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="notifications-modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notifications-modal-title">
+      <h2 id="notifications-modal-title">Alerts</h2><p class="sub">Team invitations and schedule coordination updates.</p>
+      <div id="notification-list"></div>
+      <div class="modal-actions"><button type="button" class="btn-secondary" id="mark-all-read-btn">Mark all read</button><button type="button" class="btn-primary" id="notifications-close-btn">Close</button></div>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="airspace-review-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="airspace-review-title">
+      <h2 id="airspace-review-title">Airspace source review</h2><p class="sub">Check the cited source before approval. Approval does not equal official clearance.</p>
+      <div id="airspace-review-list"></div>
+      <div class="field"><label for="review-source-type">Source classification</label><select id="review-source-type"><option value="community">Community-sourced</option><option value="authority">Authority publication checked</option></select></div>
+      <div class="field"><label for="airspace-review-notes">Review notes</label><textarea id="airspace-review-notes" maxlength="500"></textarea></div>
+      <div class="modal-actions"><button type="button" class="btn-secondary" id="airspace-review-close-btn">Close</button></div>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="flight-review-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="flight-review-title">
+      <h2 id="flight-review-title">Flight review</h2><p class="sub" id="flight-review-sub"></p>
+      <section class="review-section" id="team-review-section" hidden>
+        <h3>Internal team approval</h3>
+        <p class="review-current" id="team-review-current"></p>
+        <div class="field"><label for="team-review-notes">Team review notes</label><textarea id="team-review-notes" maxlength="500"></textarea></div>
+        <div class="review-buttons"><button type="button" class="btn-secondary" id="team-reject-btn">Reject for team operations</button><button type="button" class="btn-primary" id="team-approve-btn">Approve for team operations</button></div>
+      </section>
+      <section class="review-section" id="authority-review-section" hidden>
+        <h3>External authority decision</h3>
+        <p class="review-current" id="authority-review-current"></p>
+        <p class="authority-caveat">Record a decision issued by the named authority. SkyLedger does not issue, request, or validate official clearance.</p>
+        <div class="field"><label for="authority-status-select">Recorded status</label><select id="authority-status-select"><option value="pending">Request pending with authority</option><option value="cleared">Cleared by authority</option><option value="denied">Denied by authority</option><option value="not-requested">No request recorded</option></select></div>
+        <div class="field"><label for="authority-name-input">Aviation authority</label><input id="authority-name-input" type="text" maxlength="120" placeholder="Authority named on the decision"></div>
+        <div class="field-row"><div class="field"><label for="authority-reference-input">Decision reference</label><input id="authority-reference-input" type="text" maxlength="120" placeholder="Required for a decision"></div><div class="field"><label for="authority-valid-until-input">Clearance valid until</label><input id="authority-valid-until-input" type="date"></div></div>
+        <div class="field"><label for="authority-notes-input">Authority record notes</label><textarea id="authority-notes-input" maxlength="500"></textarea></div>
+        <div class="review-buttons"><button type="button" class="btn-primary" id="authority-record-btn">Save authority record</button></div>
+      </section>
+      <div class="modal-actions"><button type="button" class="btn-secondary" id="flight-review-close-btn">Close</button></div>
+    </div>
+  </div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script>
+(function(){
+  var BANDS=['200ft','300ft','400ft','500ft'];
+  var DAY_START=6*60, DAY_END=20*60, AXIS_HOURS=[6,9,12,15,18];
+  var ICONS={
+    medical:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+    agriculture:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-1-7.5-5-7.5-10 0-3 2-6.5 7.5-9 5.5 2.5 7.5 6 7.5 9 0 5-3 9-7.5 10z"/><path d="M12 12v9"/></svg>',
+    security:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z"/></svg>',
+    cargo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/></svg>'
+  };
+  var PAYLOAD_LABEL={medical:'Medical',agriculture:'Agriculture',security:'Security',cargo:'Cargo'};
+  var CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  var WARN_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.5 1.5 0 0 0 1.3 2.2h16.4a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z"/></svg>';
+  var X_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  var EYE_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.1 0 2.1-.2 3-.5"/></svg>';
+  var state={corridors:[],current:'',selectedDate:'',routes:[],activity:[],myRoutes:[],proposals:[],aircraft:[],drafts:[],airspace:[],weather:null,reliability:null,user:null,profile:null,team:null,notifications:[],reviewQueue:[],inviteToken:'',inviteDetails:null,resetToken:'',feedbackFlightId:'',flashIds:[],pendingSlot:null,draftWaypoints:[],draftOrigin:null,draftDestination:null};
+  var socket=io();
+  var corridorMap=null,flightMap=null,corridorLayers=null,airspaceLayers=null,draftLayers=null,weatherLocation='',weatherFetchedAt=0;
+  var placeSearchSequence={from:0,to:0};
+
+  function esc(value){return String(value==null?'':value).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function corridor(){return state.corridors.find(function(item){return item.slug===state.current;});}
+  function activeRoutes(){return state.routes.filter(function(route){return route.flightDate===state.selectedDate;});}
+  function timeToMin(value){var parts=value.split(':');return (+parts[0])*60+(+parts[1]);}
+  function minToTime(minutes){var h=Math.floor(minutes/60),m=minutes%60;return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  function newRequestId(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(char){var random=Math.random()*16|0;return (char==='x'?random:(random&3|8)).toString(16);});}
+  function formatClock(value){var date=new Date(value);return date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
+  function routesFromApi(routes){return routes.map(function(route){return Object.assign({},route,{start:route.startMin,end:route.endMin});});}
+  function draftRoutePoints(){
+    var points=state.draftWaypoints.slice();
+    if(state.draftOrigin)points.unshift({lat:state.draftOrigin.latitude,lng:state.draftOrigin.longitude});
+    if(state.draftDestination)points.push({lat:state.draftDestination.latitude,lng:state.draftDestination.longitude});
+    return points;
+  }
+  function localDateString(){
+    var parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    function value(type){return parts.find(function(part){return part.type===type;}).value;}
+    return value('year')+'-'+value('month')+'-'+value('day');
+  }
+  function formatAppDate(value){
+    if(!value)return '—';
+    var date=value instanceof Date?value:new Date(value);
+    if(Number.isNaN(date.getTime()))return '—';
+    return new Intl.DateTimeFormat('en-NG',{timeZone:'Africa/Lagos',day:'numeric',month:'short',year:'numeric'}).format(date);
+  }
+  function initializeMaps(){
+    if(typeof L==='undefined')return;
+    var center=[9.08,8.67];
+    corridorMap=L.map('corridor-map',{scrollWheelZoom:false}).setView(center,6);
+    flightMap=L.map('flight-map',{scrollWheelZoom:false}).setView(center,6);
+    var tileOptions={maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'};
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',tileOptions).addTo(corridorMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',tileOptions).addTo(flightMap);
+    corridorLayers=L.featureGroup().addTo(corridorMap);
+    airspaceLayers=L.featureGroup().addTo(corridorMap);
+    draftLayers=L.featureGroup().addTo(flightMap);
+    flightMap.on('click',function(event){
+      if(draftRoutePoints().length>=20){showToast('A flight plan can have up to 20 waypoints.',true);return;}
+      state.draftWaypoints.push({lat:Number(event.latlng.lat.toFixed(6)),lng:Number(event.latlng.lng.toFixed(6))});
+      renderDraftRoute();
+    });
+  }
+  function renderCorridorMap(){
+    renderAirspaceList();
+    if(!corridorMap||!corridorLayers||!airspaceLayers)return;
+    corridorLayers.clearLayers();
+    var paths=activeRoutes().filter(function(route){return Array.isArray(route.waypoints)&&route.waypoints.length>=2;});
+    paths.forEach(function(route){
+      var points=route.waypoints.map(function(point){return [point.lat,point.lng];});
+      var line=L.polyline(points,{color:route.isConflict?'#FFB020':'#132A52',weight:route.isConflict?5:3,opacity:.9}).bindTooltip('Route '+route.id+' · '+route.flightDate+' · '+route.band);
+      corridorLayers.addLayer(line);
+    });
+    airspaceLayers.clearLayers();
+    state.airspace.forEach(function(zone){
+      var color=zone.category==='no-fly'?'#8A3024':(zone.category==='restricted'?'#C24A3A':'#D88A00');
+      var layer=L.geoJSON(zone.geometry,{style:{color:color,weight:2,fillColor:color,fillOpacity:.16,dashArray:'5 4'}});
+      layer.bindPopup('<strong>'+esc(zone.name)+'</strong><br>'+esc(zone.category)+' · '+esc(zone.sourceType)+' source reviewed by '+esc(zone.reviewedBy||'configured reviewer')+'<br>Source: '+esc(zone.sourceName)+'<br>Checked: '+esc(new Date(zone.sourceCheckedAt).toLocaleDateString())+'<br>Review date: '+esc(new Date(zone.reviewedAt).toLocaleDateString())+'<br>Not flight clearance.');
+      airspaceLayers.addLayer(layer);
+    });
+    var groups=[corridorLayers,airspaceLayers].filter(function(group){return group.getLayers().length>0;});
+    if(groups.length){var combined=L.featureGroup(groups);corridorMap.fitBounds(combined.getBounds().pad(.15),{maxZoom:12});}
+    else corridorMap.setView([9.08,8.67],6);
+  }
+  function renderAirspaceList(){
+    var list=document.getElementById('airspace-list');if(!list)return;
+    list.innerHTML=state.airspace.map(function(zone){return '<span class="airspace-chip">'+esc(zone.name)+' · '+esc(zone.category)+' · reviewed · '+esc(zone.sourceName)+' · checked '+esc(new Date(zone.sourceCheckedAt).toLocaleDateString())+' · <a href="'+esc(zone.sourceUrl)+'" target="_blank" rel="noopener noreferrer">source</a></span>';}).join('');
+    document.getElementById('add-airspace-btn').hidden=!(state.user&&['owner','admin','dispatcher'].includes(state.user.role)&&navigator.onLine);
+  }
+  function renderWeather(){
+    var el=document.getElementById('weather-context');if(!el)return;
+    if(!state.weather){el.textContent='Weather context unavailable; check your connection.';return;}
+    var weather=state.weather,current=weather.current,units=weather.units||{};
+    el.innerHTML='<strong>Weather context</strong> · '+esc(current.temperature_2m)+' '+esc(units.temperature_2m||'')+' · wind '+esc(current.wind_speed_10m)+' '+esc(units.wind_speed_10m||'')+' · gusts '+esc(current.wind_gusts_10m)+' '+esc(units.wind_gusts_10m||'')+' · precipitation '+esc(current.precipitation)+' '+esc(units.precipitation||'')+'<br><span class="personal-plan-meta"><a href="'+esc(weather.sourceUrl)+'" target="_blank" rel="noopener noreferrer">'+esc(weather.source)+'</a> · '+esc(new Date(weather.fetchedAt).toLocaleString())+' · current conditions only; not a go/no-go decision.</span>';
+  }
+  async function loadWeather(){
+    var points=activeRoutes().flatMap(function(route){return route.waypoints||[];});
+    var latitude=points.length?points.reduce(function(total,point){return total+point.lat;},0)/points.length:9.08;
+    var longitude=points.length?points.reduce(function(total,point){return total+point.lng;},0)/points.length:8.67;
+    var location=latitude.toFixed(2)+','+longitude.toFixed(2);
+    if(location===weatherLocation&&Date.now()-weatherFetchedAt<15*60*1000)return;
+    weatherLocation=location;
+    try{state.weather=await api('/api/weather?lat='+encodeURIComponent(latitude)+'&lon='+encodeURIComponent(longitude));weatherFetchedAt=Date.now();}
+    catch(error){state.weather=null;}
+    renderWeather();
+  }
+  function renderDraftRoute(){
+    if(!draftLayers)return;
+    draftLayers.clearLayers();
+    var points=draftRoutePoints().map(function(point){return [point.lat,point.lng];});
+    points.forEach(function(point,index){L.circleMarker(point,{radius:6,color:'#0B1E3D',fillColor:'#FFB020',fillOpacity:1}).bindTooltip('Waypoint '+(index+1)).addTo(draftLayers);});
+    if(points.length>1)L.polyline(points,{color:'#132A52',weight:4}).addTo(draftLayers);
+    document.getElementById('waypoint-count').textContent=points.length?points.length+' route point'+(points.length===1?'':'s')+' selected':'No route points selected';
+  }
+  function resetDraftRoute(){
+    state.draftWaypoints=[];state.draftOrigin=null;state.draftDestination=null;
+    ['from','to'].forEach(function(endpoint){
+      document.getElementById('f-'+endpoint+'-results').hidden=true;
+      document.getElementById('f-'+endpoint+'-coordinate-status').textContent='';
+    });
+    renderDraftRoute();
+  }
+  function addDraftWaypoint(latitude,longitude){
+    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude < -90||latitude > 90||longitude < -180||longitude > 180){showToast('Enter a valid latitude and longitude.',true);return false;}
+    if(draftRoutePoints().length>=20){showToast('A flight plan can have up to 20 route waypoints.',true);return false;}
+    state.draftWaypoints.push({lat:latitude,lng:longitude});renderDraftRoute();return true;
+  }
+  async function api(url,options){
+    var response=await fetch(url,Object.assign({credentials:'same-origin',headers:{'Content-Type':'application/json'}},options||{}));
+    var data=await response.json().catch(function(){return {};});
+    if(!response.ok){if(response.status===401&&state.user)openAccountModal('login');throw new Error(data.error||'The request could not be completed.');}
+    return data;
+  }
+  function clearRouteEndpoint(endpoint){
+    placeSearchSequence[endpoint]+=1;
+    if(endpoint==='from')state.draftOrigin=null;
+    else state.draftDestination=null;
+    document.getElementById('f-'+endpoint+'-coordinate-status').textContent='';
+    document.getElementById('f-'+endpoint+'-results').hidden=true;
+    renderDraftRoute();
+  }
+  function chooseRoutePlace(endpoint,place){
+    var otherEndpoint=endpoint==='from'?state.draftDestination:state.draftOrigin;
+    if(state.draftWaypoints.length+1+(otherEndpoint?1:0)>20){showToast('A flight plan can have up to 20 route points.',true);return;}
+    var label=[place.name,place.admin2,place.admin1].filter(function(value,index,values){return value&&values.indexOf(value)===index;}).join(', ');
+    if(endpoint==='from')state.draftOrigin=place;
+    else state.draftDestination=place;
+    document.getElementById('f-'+endpoint).value=label;
+    document.getElementById('f-'+endpoint+'-coordinate-status').textContent='Selected: '+place.latitude.toFixed(6)+', '+place.longitude.toFixed(6);
+    document.getElementById('f-'+endpoint+'-results').hidden=true;
+    renderDraftRoute();
+    if(flightMap)flightMap.setView([place.latitude,place.longitude],Math.max(flightMap.getZoom(),11));
+  }
+  async function searchRoutePlace(endpoint){
+    var input=document.getElementById('f-'+endpoint),button=document.getElementById('f-'+endpoint+'-search');
+    var resultsBox=document.getElementById('f-'+endpoint+'-results'),status=document.getElementById('f-'+endpoint+'-coordinate-status');
+    var query=input.value.trim();
+    if(query.length<3){status.textContent='Enter at least 3 characters to search Nigerian places.';resultsBox.hidden=true;return;}
+    var sequence=++placeSearchSequence[endpoint];
+    button.disabled=true;status.textContent='Searching Nigerian places…';resultsBox.textContent='Searching…';resultsBox.hidden=false;
+    try{
+      var response=await api('/api/geocoding/search?q='+encodeURIComponent(query));
+      if(sequence!==placeSearchSequence[endpoint])return;
+      resultsBox.innerHTML='';
+      if(!response.results.length){resultsBox.textContent='No matching Nigerian places found.';return;}
+      response.results.forEach(function(place){
+        var option=document.createElement('button');
+        option.type='button';option.className='place-result';
+        var label=[place.name,place.admin2,place.admin1].filter(function(value,index,values){return value&&values.indexOf(value)===index;}).join(', ');
+        option.textContent=label+' · '+place.latitude.toFixed(5)+', '+place.longitude.toFixed(5);
+        option.addEventListener('click',function(){chooseRoutePlace(endpoint,place);});
+        resultsBox.appendChild(option);
+      });
+      status.textContent=response.attribution||'Select a matching place to use its coordinates.';
+    }catch(error){
+      if(sequence===placeSearchSequence[endpoint]){resultsBox.hidden=true;status.textContent=error.message;}
+    }finally{
+      if(sequence===placeSearchSequence[endpoint])button.disabled=false;
+    }
+  }
+  async function updateFooterStatus(){
+    var container=document.getElementById('footer-health'),label=document.getElementById('footer-service-status');
+    try{
+      var health=await api('/api/health');
+      var operational=health.status==='ok'&&health.database;
+      container.dataset.state=operational?'operational':'degraded';
+      label.textContent=operational?'Operational':'Database unavailable';
+    }catch(error){
+      container.dataset.state='offline';
+      label.textContent='Connection unavailable';
+    }
+  }
+  async function loadPersonal(){
+    if(!state.user){state.myRoutes=[];state.proposals=[];return;}
+    var results=await Promise.all([api('/api/me/flights'),api('/api/me/proposals')]);
+    state.myRoutes=results[0];state.proposals=results[1];
+    renderPersonal();renderProposals();
+  }
+  async function loadCurrent(){
+    if(!state.current)return;
+    var prefix='/api/corridors/'+encodeURIComponent(state.current);
+    var results=await Promise.all([api(prefix+'/flights'),api(prefix+'/activity'),api(prefix+'/reliability'),api(prefix+'/airspace')]);
+    state.routes=routesFromApi(results[0]);state.activity=results[1];state.reliability=results[2];state.airspace=results[3];
+    if(state.user&&navigator.onLine)await loadPersonal();
+    render();
+    loadWeather();
+  }
+  function render(){renderAccount();renderCorridorSelect();renderStats();renderGrid();renderCapacity();renderCorridorMap();renderList();renderActivity();renderReliability();renderWeather();renderPersonal();renderProposals();renderAircraftSelect();renderFleet();renderOfflineDrafts();renderTeam();renderNotifications();renderAirspaceReview();updateEnduranceWarning();}
+  function renderAccount(){
+    document.getElementById('sign-in-btn').hidden=Boolean(state.user);
+    document.getElementById('account-controls').hidden=!state.user;
+    document.getElementById('profile-nav-btn').hidden=!state.user;
+    document.getElementById('profile-nav-btn').textContent=document.body.classList.contains('profile-view')?'Dashboard':'Profile';
+    document.getElementById('team-btn').hidden=!(state.user&&['owner','admin'].includes(state.user.role));
+    var adminInviteOption=document.querySelector('#invite-role option[value="admin"]');
+    if(adminInviteOption)adminInviteOption.hidden=!(state.user&&state.user.role==='owner');
+    document.getElementById('notifications-btn').hidden=!state.user;
+    document.getElementById('airspace-review-btn').hidden=!(state.user&&state.user.canReviewAirspace);
+    document.getElementById('account-name').textContent=state.user?(state.user.organizationName||state.user.name):'';
+    var areaManagers=state.user&&['owner','admin','dispatcher'].includes(state.user.role);
+    document.getElementById('new-corridor-btn').hidden=!areaManagers;
+    document.getElementById('delete-corridor-btn').hidden=!(state.user&&state.current&&['owner','admin'].includes(state.user.role));
+    document.getElementById('reset-btn').hidden=!(state.user&&['owner','admin'].includes(state.user.role));
+    document.getElementById('personal-panel').hidden=!state.user;
+    var canSubmit=state.user&&['owner','admin','dispatcher','pilot'].includes(state.user.role);
+    document.getElementById('open-modal-btn').textContent=!state.user?'Sign in to submit a plan':(canSubmit?'+ New Flight Plan':'View-only access');
+    document.getElementById('open-modal-btn').disabled=Boolean(state.user&&!canSubmit);
+    renderNotifications();
+  }
+  function loadProfile(){return api('/api/me/profile').then(function(profile){state.profile=profile;renderProfile();return profile;});}
+  function renderProfile(){
+    var profile=state.profile;if(!profile)return;
+    var user=profile.user,organization=profile.organization,owner=organization.owner||{};
+    document.getElementById('profile-org-summary').textContent=organization.name||'—';
+    document.getElementById('profile-owner-summary').textContent=owner.name||'—';
+    document.getElementById('profile-members-summary').textContent=String(organization.memberCount||0);
+    document.getElementById('profile-locations-summary').textContent=String(state.corridors.length);
+    document.getElementById('profile-pilot-name').textContent=user.name||'—';
+    document.getElementById('profile-pilot-email').textContent=user.email||'—';
+    document.getElementById('profile-email-status').textContent=user.emailVerified?'Verified':'Not verified';
+    document.getElementById('profile-role').textContent=user.role.charAt(0).toUpperCase()+user.role.slice(1);
+    document.getElementById('profile-member-since').textContent=formatAppDate(user.createdAt);
+    document.getElementById('profile-org-created').textContent=formatAppDate(organization.createdAt);
+    document.getElementById('profile-owner-contact').textContent=(owner.name||'—')+(owner.email?' · '+owner.email:'');
+    document.getElementById('profile-member-list').innerHTML=(organization.members||[]).map(function(member){
+      var role=member.role||'viewer';
+      return '<div class="profile-member"><strong>'+esc(member.name)+'</strong><span>'+esc(role.charAt(0).toUpperCase()+role.slice(1))+'</span><small>Joined '+(member.createdAt?esc(formatAppDate(member.createdAt)):'date unavailable')+'</small></div>';
+    }).join('')||'<p class="profile-security-note">No active members listed.</p>';
+    document.getElementById('profile-name-input').value=user.name||'';
+    document.getElementById('profile-org-input').value=organization.name||'';
+    document.getElementById('profile-org-input').disabled=!['owner','admin'].includes(user.role);
+    document.getElementById('profile-org-hint').textContent=['owner','admin'].includes(user.role)?'Organization owners and admins can edit this name.':'Only organization owners and admins can edit this name.';
+    document.getElementById('profile-email-input').value=user.email||'';
+    document.getElementById('profile-security-note').textContent=user.emailVerified?'Your login email is verified. Password resets are sent to '+user.email+'.':'Your login email is not verified. Verify it before using account security actions.';
+    document.getElementById('profile-reset-password-btn').disabled=!user.emailVerified;
+    var transferWrap=document.getElementById('delete-transfer-wrap'),transferSelect=document.getElementById('delete-transfer-select');
+    var successors=(organization.members||[]).filter(function(member){return member.id!==user.id;});
+    transferWrap.hidden=user.role!=='owner'||successors.length===0;
+    transferSelect.innerHTML='<option value="">Select a successor</option>'+successors.map(function(member){return '<option value="'+esc(member.id)+'">'+esc(member.name)+' · '+esc(member.role)+'</option>';}).join('');
+  }
+  function setProfileTab(tab){
+    document.querySelectorAll('[data-profile-tab]').forEach(function(button){button.classList.toggle('active',button.getAttribute('data-profile-tab')===tab);});
+    document.getElementById('profile-overview').hidden=tab!=='overview';
+    document.getElementById('profile-settings').hidden=tab!=='settings';
+  }
+  async function openProfilePage(){
+    if(!state.user)return;
+    document.body.classList.add('profile-view');
+    document.getElementById('profile-view').hidden=false;
+    document.getElementById('profile-nav-btn').textContent='Dashboard';
+    document.getElementById('profile-error').hidden=true;
+    try{await loadProfile();}
+    catch(error){document.getElementById('profile-error').textContent=error.message;document.getElementById('profile-error').hidden=false;}
+  }
+  function closeProfilePage(){
+    document.body.classList.remove('profile-view');
+    document.getElementById('profile-view').hidden=true;
+    document.getElementById('profile-nav-btn').textContent='Profile';
+  }
+  function renderPersonal(){
+    var el=document.getElementById('personal-plan-list');
+    if(!el)return;
+    if(!state.user){el.innerHTML='';return;}
+    if(state.myRoutes.length===0){el.innerHTML='<p class="caption" style="margin:0;">No saved flight plans yet.</p>';return;}
+    el.innerHTML=state.myRoutes.map(function(route){var reported=route.feedbackAt?'<div class="personal-plan-meta">Outcome reported · '+esc(route.disruption||'none')+'</div>':'';return '<div class="personal-plan"><div class="personal-plan-info"><strong>Route '+esc(route.id)+' · '+esc(route.operator)+'</strong><div class="personal-plan-meta">'+esc(route.corridorLabel)+' · '+esc(route.flightDate||'Legacy plan')+' · '+esc(route.from)+' → '+esc(route.to)+' · <span class="mono">'+minToTime(route.startMin)+'–'+minToTime(route.endMin)+' · '+esc(route.band)+'</span></div>'+reported+'</div><button class="btn-secondary" type="button" onclick="openPlanCorridor(\''+esc(route.corridor)+'\')">View location</button><button class="btn-secondary" type="button" '+(!navigator.onLine?'disabled':'')+' onclick="openFeedback(\''+esc(route._id)+'\')">'+(route.feedbackAt?'Update outcome':'Log outcome')+'</button><button class="btn-secondary" type="button" onclick="cancelRoute(\''+esc(route._id)+'\')">Cancel</button></div>';}).join('');
+  }
+  function renderReliability(){
+    var el=document.getElementById('reliability-metrics');if(!el)return;
+    if(!state.reliability||state.reliability.completedFlights===0){el.innerHTML='<p class="caption" style="margin:0;">No operator-reported outcomes yet.</p>';return;}
+    var data=state.reliability,delay=data.averageArrivalDelayMin,delayText=delay>0?delay+' min late':(delay<0?Math.abs(delay)+' min early':'On schedule');
+    var disruptionCount=Object.values(data.disruptions||{}).reduce(function(total,count){return total+count;},0);
+    el.innerHTML='<div class="reliability-grid"><div><strong class="reliability-value">'+data.completedFlights+'</strong><span class="reliability-label">Reported flights</span></div><div><strong class="reliability-value">'+data.onTimePercent+'%</strong><span class="reliability-label">On-time reports</span></div><div><strong class="reliability-value">'+esc(delayText)+'</strong><span class="reliability-label">Average arrival variance</span></div><div><strong class="reliability-value">'+disruptionCount+'</strong><span class="reliability-label">Reported disruptions</span></div></div>';
+  }
+  function renderAircraftSelect(){
+    var select=document.getElementById('f-aircraft');
+    if(!select)return;
+    var selected=select.value;
+    select.innerHTML='<option value="">No saved aircraft</option>'+state.aircraft.map(function(item){return '<option value="'+esc(item.id)+'">'+esc(item.name)+(item.registration?' · '+esc(item.registration):'')+' · '+item.enduranceMin+' min endurance</option>';}).join('');
+    if(state.aircraft.some(function(item){return item.id===selected;}))select.value=selected;
+  }
+  function renderFleet(){
+    var el=document.getElementById('fleet-list');
+    if(!el)return;
+    if(state.aircraft.length===0){el.innerHTML='<p class="caption" style="margin:0 0 14px;">No aircraft saved yet.</p>';return;}
+    el.innerHTML=state.aircraft.map(function(item){var model=[item.manufacturer,item.model].filter(Boolean).join(' ');return '<div class="fleet-record"><span><strong>'+esc(item.name)+'</strong><br>'+esc(model||'Aircraft')+' · '+item.enduranceMin+' min'+(item.registration?' · '+esc(item.registration):'')+'</span><button class="btn-text" type="button" onclick="archiveAircraft(\''+esc(item.id)+'\')">Archive</button></div>';}).join('');
+  }
+  function renderTeam(){
+    var el=document.getElementById('team-member-list');if(!el)return;
+    if(!state.team){el.innerHTML='';return;}
+    var options=['admin','dispatcher','pilot','viewer'];
+    var members=state.team.members.map(function(member){
+      var canEdit=member.role!=='owner'&&member.id!==state.user.id&&(state.user.role==='owner'||member.role!=='admin');
+      var role=canEdit?'<select aria-label="Role for '+esc(member.name)+'" onchange="changeTeamRole(\''+esc(member.id)+'\',this.value)">'+options.map(function(item){return '<option value="'+item+'"'+(item===member.role?' selected':'')+(state.user.role==='admin'&&item==='admin'?' disabled':'')+'>'+item+'</option>';}).join('')+'</select>':'<span>'+esc(member.role)+'</span>';
+      var remove=canEdit?'<button class="btn-text" type="button" onclick="removeTeamMember(\''+esc(member.id)+'\')">Remove</button>':'';
+      return '<div class="team-entry"><div class="team-entry-row"><span><strong>'+esc(member.name)+'</strong><br>'+esc(member.email)+'</span><span>'+role+' '+remove+'</span></div></div>';
+    }).join('');
+    var invites=state.team.invitations.map(function(invite){return '<div class="team-entry"><div class="team-entry-row"><span>'+esc(invite.email)+' · '+esc(invite.role)+'<br><span class="notification-meta">Invitation pending</span></span><button class="btn-text" type="button" onclick="revokeTeamInvite(\''+esc(invite.id)+'\')">Revoke</button></div></div>';}).join('');
+    el.innerHTML='<h3>Members</h3>'+(members||'<p class="caption">No team members.</p>')+'<h3>Invitations</h3>'+(invites||'<p class="caption">No pending invitations.</p>');
+  }
+  function renderNotifications(){
+    var list=document.getElementById('notification-list'),button=document.getElementById('notifications-btn');if(!list||!button)return;
+    var unread=state.notifications.filter(function(item){return !item.readAt;}).length;
+    button.textContent=unread?'Alerts · '+unread:'Alerts';
+    list.innerHTML=state.notifications.length?state.notifications.map(function(item){return '<div class="notification-entry'+(item.readAt?'':' unread')+'"><div class="team-entry-row"><span><strong>'+esc(item.title)+'</strong><br>'+esc(item.message)+'<br><span class="notification-meta">'+esc(new Date(item.createdAt).toLocaleString())+' · email '+esc(item.emailStatus)+'</span></span>'+(!item.readAt?'<button class="btn-text" type="button" onclick="markNotificationRead(\''+esc(item.id)+'\')">Mark read</button>':'')+'</div></div>';}).join(''):'<p class="caption">No alerts yet.</p>';
+  }
+  function renderAirspaceReview(){
+    var list=document.getElementById('airspace-review-list');if(!list)return;
+    list.innerHTML=state.reviewQueue.length?state.reviewQueue.map(function(zone){return '<div class="review-entry"><strong>'+esc(zone.name)+' · '+esc(zone.category)+'</strong><br>'+esc(zone.corridorLabel)+' · submitted by '+esc(zone.submittedBy)+' · '+esc(zone.sourceName)+' · source checked '+esc(new Date(zone.sourceCheckedAt).toLocaleDateString())+'<br><a href="'+esc(zone.sourceUrl)+'" target="_blank" rel="noopener noreferrer">Review cited source</a><div class="proposal-actions"><button class="btn-secondary" type="button" onclick="reviewAirspace(\''+esc(zone.corridor)+'\',\''+esc(zone.id)+'\',\'approve\')">Approve for map</button><button class="btn-secondary" type="button" onclick="reviewAirspace(\''+esc(zone.corridor)+'\',\''+esc(zone.id)+'\',\'reject\')">Reject</button></div></div>';}).join(''):'<p class="caption">No pending airspace sources.</p>';
+  }
+  function updateEnduranceWarning(){
+    var warning=document.getElementById('endurance-warning'),aircraft=state.aircraft.find(function(item){return item.id===document.getElementById('f-aircraft').value;});
+    if(!warning||!aircraft){if(warning)warning.hidden=true;return;}
+    var start=document.getElementById('f-start').value,end=document.getElementById('f-end').value;
+    if(!start||!end){warning.hidden=true;return;}
+    var duration=timeToMin(end)-timeToMin(start);
+    warning.textContent=duration>aircraft.enduranceMin?'Planning alert: this '+duration+' minute plan exceeds '+aircraft.name+' saved endurance ('+aircraft.enduranceMin+' minutes). Verify the aircraft’s operating limits.':'Saved endurance: '+aircraft.enduranceMin+' minutes. This is operator-provided planning information.';
+    warning.hidden=false;
+  }
+  async function loadFleet(){state.aircraft=state.user&&navigator.onLine?await api('/api/me/aircraft'):[];renderAircraftSelect();renderFleet();updateEnduranceWarning();}
+  async function loadTeam(){state.team=state.user&&['owner','admin'].includes(state.user.role)?await api('/api/me/team'):null;renderTeam();}
+  async function loadNotifications(){state.notifications=state.user&&navigator.onLine?await api('/api/me/notifications'):[];renderNotifications();}
+  async function loadAirspaceReview(){
+    if(!state.user||!state.user.canReviewAirspace){state.reviewQueue=[];renderAirspaceReview();return;}
+    var lists=await Promise.all(state.corridors.map(async function(item){var zones=await api('/api/corridors/'+encodeURIComponent(item.slug)+'/airspace-review');return zones.map(function(zone){return Object.assign({},zone,{corridor:item.slug,corridorLabel:item.label});});}));
+    state.reviewQueue=lists.flat();renderAirspaceReview();
+  }
+  function openDraftDb(){
+    return new Promise(function(resolve,reject){
+      var request=indexedDB.open('skyledger-offline-v1',1);
+      request.onupgradeneeded=function(){request.result.createObjectStore('drafts',{keyPath:'clientRequestId'});};
+      request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error);};
+    });
+  }
+  async function readOfflineDrafts(){
+    var db=await openDraftDb();
+    return new Promise(function(resolve,reject){var tx=db.transaction('drafts','readonly'),request=tx.objectStore('drafts').getAll();request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error);};tx.oncomplete=function(){db.close();};});
+  }
+  async function writeOfflineDraft(draft,remove){
+    var db=await openDraftDb();
+    return new Promise(function(resolve,reject){var tx=db.transaction('drafts','readwrite'),store=tx.objectStore('drafts');if(remove)store.delete(draft.clientRequestId);else store.put(draft);tx.oncomplete=function(){db.close();resolve();};tx.onerror=function(){db.close();reject(tx.error);};});
+  }
+  function renderOfflineDrafts(){
+    var panel=document.getElementById('offline-draft-panel'),el=document.getElementById('offline-draft-list');
+    if(!panel||!el)return;
+    var drafts=state.user?state.drafts.filter(function(draft){return draft.userId===state.user.id;}):[];
+    panel.hidden=drafts.length===0;
+    el.innerHTML=drafts.map(function(draft){return '<div class="fleet-record"><span><strong>'+esc(draft.body.from)+' → '+esc(draft.body.to)+'</strong><br>'+esc(draft.corridorLabel)+' · '+esc(draft.body.flightDate)+' · '+minToTime(draft.body.startMin)+'–'+minToTime(draft.body.endMin)+'</span><button class="btn-text" type="button" onclick="removeOfflineDraft(\''+esc(draft.clientRequestId)+'\')">Remove</button></div>';}).join('');
+  }
+  async function syncOfflineDrafts(){
+    if(!navigator.onLine||!state.user)return;
+    state.drafts=await readOfflineDrafts().catch(function(){return [];});renderOfflineDrafts();
+    var synced=false;
+    for(var draft of state.drafts){
+      if(draft.userId!==state.user.id)continue;
+      setSyncStatus('Syncing saved plans…');
+      try{await api('/api/corridors/'+encodeURIComponent(draft.slug)+'/flights',{method:'POST',body:JSON.stringify(draft.body)});await writeOfflineDraft(draft,true);synced=true;}
+      catch(error){if(error instanceof TypeError||!navigator.onLine)break;showToast('Offline plan needs attention: '+error.message,true);}
+    }
+    state.drafts=await readOfflineDrafts().catch(function(){return [];});renderOfflineDrafts();
+    setSyncStatus(navigator.onLine?'Synced across devices':'Offline · saved on this device');
+    if(synced)await loadCurrent().catch(function(){});
+  }
+  function renderProposals(){
+    var el=document.getElementById('proposal-list');
+    if(!el)return;
+    if(!state.user){el.innerHTML='';return;}
+    if(state.proposals.length===0){el.innerHTML='<p class="caption" style="margin:0;">No coordination proposals yet.</p>';return;}
+    el.innerHTML=state.proposals.map(function(proposal){
+      var incoming=proposal.direction==='incoming',time=minToTime(proposal.proposedStartMin)+'–'+minToTime(proposal.proposedEndMin),summary=incoming
+        ?esc(proposal.proposerName)+' proposes Route '+esc(proposal.proposerFlight.id)+' change to '+esc(proposal.proposedBand)+' at '+time+' to clear conflict with your Route '+esc(proposal.recipientFlight.id)+'.'
+        :'Your Route '+esc(proposal.proposerFlight.id)+' proposal for Route '+esc(proposal.recipientFlight.id)+' in '+esc(proposal.corridorLabel)+': '+esc(proposal.proposedBand)+' at '+time+'.';
+      var actions=incoming&&proposal.status==='pending'?'<div class="proposal-actions"><button class="btn-secondary" type="button" onclick="respondProposal(\''+esc(proposal.id)+'\',\'accept\')">Accept</button><button class="btn-secondary" type="button" onclick="respondProposal(\''+esc(proposal.id)+'\',\'decline\')">Decline</button></div>':'';
+      return '<div class="proposal-row">'+summary+'<span class="proposal-status">'+esc(proposal.status)+'</span>'+actions+'</div>';
+    }).join('');
+  }
+  function renderActivity(){
+    var el=document.getElementById('activity-list');
+    if(state.activity.length===0){el.innerHTML='<p class="caption" style="margin:0;">No activity yet.</p>';return;}
+    el.innerHTML=state.activity.map(function(entry){return '<div class="activity-row"><span class="mono activity-time">'+formatClock(entry.createdAt)+'</span><span>'+esc(entry.text)+'</span></div>';}).join('');
+  }
+  function renderCorridorSelect(){
+    var select=document.getElementById('corridor-select');
+    if(!select)return;
+    if(!state.corridors || state.corridors.length===0){
+      select.innerHTML='<option value="">No locations</option>';
+      select.disabled=true;
+      return;
+    }
+    select.disabled=false;
+    select.innerHTML=state.corridors.map(function(item){return '<option value="'+esc(item.slug)+'"'+(item.slug===state.current?' selected':'')+'>'+esc(item.label)+'</option>';}).join('');
+  }
+  function renderStats(){
+    var routes=activeRoutes(),conflictCount=routes.filter(function(route){return route.isConflict;}).length;
+    document.getElementById('stats').innerHTML='<strong>'+routes.length+'</strong> route'+(routes.length!==1?'s':'')+' on '+esc(state.selectedDate)+' · <strong>'+conflictCount+'</strong> conflict'+(conflictCount!==1?'s':'')+' flagged';
+    document.getElementById('list-caption').textContent=routes.length?'Flight plans for '+state.selectedDate+' in '+(corridor()||{}).label+'.':'';
+  }
+  function assignSlots(routes){
+    var sorted=routes.slice().sort(function(a,b){return a.start-b.start;}),slotEnds=[],assignment={};
+    sorted.forEach(function(route){var placed=false;for(var i=0;i<slotEnds.length;i++){if(slotEnds[i]<=route.start){slotEnds[i]=route.end;assignment[route._id]=i;placed=true;break;}}if(!placed){slotEnds.push(route.end);assignment[route._id]=slotEnds.length-1;}});
+    return {assignment:assignment,count:Math.max(slotEnds.length,1)};
+  }
+  function renderCapacity(){
+    var el=document.getElementById('capacity-grid'),startOfDay=6*60,slotSize=30,slotCount=28;
+    var headings='<div class="capacity-row"><span class="capacity-label">Band</span>';
+    for(var slot=0;slot<slotCount;slot++){var minute=startOfDay+slot*slotSize;headings+='<span class="capacity-time">'+(minute%60===0?minToTime(minute):'')+'</span>';}
+    headings+='</div>';
+    var rows=BANDS.slice().reverse().map(function(band){
+      var cells='';
+      for(var index=0;index<slotCount;index++){
+        var slotStart=startOfDay+index*slotSize,slotEnd=slotStart+slotSize;
+        var occupants=activeRoutes().filter(function(route){return route.band===band&&route.start<slotEnd&&slotStart<route.end;});
+        var hasConflict=occupants.some(function(route){return (route.conflictsWith||[]).some(function(letter){return occupants.some(function(other){return other.id===letter;});});});
+        var history=(state.reliability&&state.reliability.departureShiftByHour||[]).find(function(item){return item.hour===Math.floor(slotStart/60);});
+        var historyDelay=history&&history.samples>=3&&history.averageMinutes>=10;
+        var className=(hasConflict?'conflict':(occupants.length?'busy':'open'))+(historyDelay?' historical-delay':'');
+        var label=minToTime(slotStart)+'–'+minToTime(slotEnd)+', '+band+', '+(hasConflict?'conflict':(occupants.length?occupants.length+' scheduled flight'+(occupants.length===1?'':'s'):'open'))+(history?'; reported average departure shift '+history.averageMinutes+' minutes from '+history.samples+' flights':'');
+        cells+='<button class="capacity-slot '+className+'" type="button" aria-label="'+esc(label)+'" title="'+esc(label)+'" '+(occupants.length?'disabled':'onclick="selectCapacitySlot(\''+band+'\','+slotStart+')"')+'>'+(occupants.length?occupants.length:'')+'</button>';
+      }
+      return '<div class="capacity-row"><span class="capacity-label">'+band+'</span>'+cells+'</div>';
+    }).join('');
+    el.innerHTML=headings+rows;
+  }
+  function renderGrid(){
+    var el=document.getElementById('grid-inner'),routes=activeRoutes();
+    if(routes.length===0){el.innerHTML='<div class="empty"><div class="empty-icon">&#9992;&#65039;</div><h3>No flight plans registered yet</h3><p>Submit the first flight plan for '+esc((corridor()||{}).label)+' to start coordinating traffic.</p><button class="btn-primary" type="button" onclick="document.getElementById(\'open-modal-btn\').click()">+ New Flight Plan</button></div>';return;}
+    var lanes=BANDS.slice().reverse().map(function(band){
+      var laneRoutes=routes.filter(function(route){return route.band===band;}),slots=assignSlots(laneRoutes),pad=6,gap=3,slotH=(48-pad*2-gap*(slots.count-1))/slots.count;
+      var bars=laneRoutes.map(function(route){var left=((route.start-DAY_START)/(DAY_END-DAY_START))*100,width=Math.max(((route.end-route.start)/(DAY_END-DAY_START))*100,3),slot=slots.assignment[route._id],top=pad+slot*(slotH+gap),flash=state.flashIds.indexOf(route._id)>-1?' flash':'',tip='Route '+route.id+' · '+route.from+' → '+route.to+' · '+minToTime(route.start)+'–'+minToTime(route.end)+' · '+band;return '<div class="bar'+(route.isConflict?' conflict':'')+flash+'" style="left:'+left+'%;width:'+width+'%;top:'+top+'px;height:'+slotH+'px" title="'+esc(tip)+'">'+esc(route.id)+'</div>';}).join('');
+      return '<div class="lane"><div class="lane-label">'+band+'</div><div class="lane-track">'+bars+'</div></div>';
+    }).join('');
+    var axis=AXIS_HOURS.map(function(hour){var left=((hour*60-DAY_START)/(DAY_END-DAY_START))*100,translate=left===0?'0%':(left>=85?'-100%':'-50%');return '<span style="left:'+left+'%;transform:translateX('+translate+')">'+(hour<10?'0':'')+hour+':00</span>';}).join('');
+    el.innerHTML=lanes+'<div class="axis"><div class="axis-spacer"></div><div class="axis-track">'+axis+'</div></div>';
+  }
+  function renderList(){
+    var el=document.getElementById('route-list'),routes=activeRoutes();
+    if(routes.length===0){el.innerHTML='';return;}
+    el.innerHTML=routes.map(function(route){
+      var operationalRole=state.user&&['owner','admin','dispatcher'].includes(state.user.role);
+      var detail='',canManage=Boolean(state.user&&(route.ownerId===state.user.id||(operationalRole&&route.organizationId===state.user.organizationId)||(route.isDemo&&['owner','admin','dispatcher','pilot'].includes(state.user.role))));
+      var canReviewTeam=Boolean(state.user&&state.user.canReviewFlightPlans&&route.organizationId===state.user.organizationId&&route.ownerId!==state.user.id);
+      var canRecordAuthority=Boolean(state.user&&state.user.canRecordAuthorityDecision);
+      if(route.isConflict){
+        var names=(route.conflictsWith||[]).map(function(letter){return 'Route '+letter;}).join(', '),fix=route.suggestedFix,fixText=fix?(fix.type==='band'?'shift to the '+fix.value+' band':'delay departure to '+minToTime(fix.value)):'recalculate';
+        var proposeButtons=canManage?(route.conflictsWith||[]).map(function(letter){var other=routes.find(function(item){return item.id===letter;});return other&&other.ownerId&&other.ownerId!==state.user.id&&other.organizationId!==state.user.organizationId?'<button class="btn-secondary" type="button" onclick="proposeFix(\''+esc(route._id)+'\',\''+esc(other._id)+'\')">Propose change to Route '+esc(other.id)+'</button>':'';}).join(''):'';
+        detail='<div class="conflict-detail"><strong>Conflicts with '+esc(names)+'.</strong> Suggested fix: '+esc(fixText)+'.'+(canManage?'<div class="apply-btn"><button class="btn-secondary" type="button" onclick="applyFix(\''+esc(route._id)+'\')">Apply fix</button>'+proposeButtons+'</div>':'')+'</div>';
+      }
+      var ncaa=route.ncaaId?'<span class="ncaa-badge">NCAA ID · operator-provided: '+esc(route.ncaaId)+'</span>':'';
+      var date=route.flightDate?'<span class="mono">'+esc(route.flightDate)+'</span>':'';
+      var aircraft=route.aircraft?'<span>'+esc(route.aircraft.name)+(route.aircraft.registration?' · '+esc(route.aircraft.registration):'')+' · '+route.aircraft.enduranceMin+' min endurance</span>':'';
+      var readiness=route.batteryStartPercent!=null?'<span>Battery '+route.batteryStartPercent+'%'+(route.batteryReservePercent!=null?' / reserve '+route.batteryReservePercent+'%':'')+'</span>':'';
+      var cancel=canManage?'<button class="cancel-x" type="button" onclick="cancelRoute(\''+esc(route._id)+'\')" aria-label="Cancel Route '+esc(route.id)+'" title="Cancel this flight plan">'+X_ICON+'</button>':'';
+      var internalStatus=route.internalApprovalStatus||'pending';
+      var authorityStatus=route.authorityClearanceStatus||'not-requested';
+      var authorityRecord=route.authorityName?' · '+esc(route.authorityName):'';
+      if(route.authorityReference)authorityRecord+=' · ref '+esc(route.authorityReference);
+      var reviewButton=canReviewTeam||canRecordAuthority?'<button class="btn-secondary clearance-action" type="button" onclick="openFlightReview(\''+esc(route._id)+'\')">Review</button>':'';
+      var clearance='<div class="clearance-row"><span><strong>Team review:</strong> '+esc(statusLabel(internalStatus))+'</span><span><strong>Authority record:</strong> '+esc(statusLabel(authorityStatus))+authorityRecord+'</span>'+reviewButton+'</div>';
+      return '<div class="route-row'+(route.isConflict?' conflict':'')+'">'+cancel+'<div class="route-top"><div class="status-dot '+(route.isConflict?'conflict':'clear')+'">'+(route.isConflict?WARN_ICON:CHECK_ICON)+'</div><div><div class="route-name">Route '+esc(route.id)+'</div><div class="route-operator">'+esc(route.operator)+'</div></div><span class="payload-badge">'+(ICONS[route.payload]||'')+(PAYLOAD_LABEL[route.payload]||esc(route.payload))+'</span>'+ncaa+'<div class="route-meta"><span>'+esc(route.from)+' → '+esc(route.to)+'</span>'+aircraft+date+'<span class="mono">'+minToTime(route.start)+'–'+minToTime(route.end)+'</span><span class="mono">'+esc(route.band)+'</span>'+readiness+'</div></div>'+(route.payloadDetails?'<p class="personal-plan-meta">Payload: '+esc(route.payloadDetails)+'</p>':'')+(route.contingencyPlan?'<p class="personal-plan-meta">Contingency: '+esc(route.contingencyPlan)+'</p>':'')+clearance+detail+'</div>';
+    }).join('');
+  }
+  function statusLabel(status){return ({pending:'Pending',approved:'Approved',rejected:'Rejected','not-requested':'Not requested',cleared:'Cleared by authority',denied:'Denied by authority'})[status]||'Unknown';}
+  window.openFlightReview=async function(flightId){
+    var flight=state.routes.find(function(route){return route._id===flightId;});if(!flight)return;
+    state.reviewFlightId=flightId;
+    document.getElementById('flight-review-title').textContent='Review Route '+flight.id;
+    document.getElementById('flight-review-sub').textContent=flight.operator+' · '+flight.from+' → '+flight.to+' · '+flight.flightDate;
+    document.getElementById('team-review-section').hidden=!(state.user&&state.user.canReviewFlightPlans&&flight.organizationId===state.user.organizationId&&flight.ownerId!==state.user.id);
+    document.getElementById('authority-review-section').hidden=!(state.user&&state.user.canRecordAuthorityDecision);
+    document.getElementById('team-review-current').textContent='Current status: '+statusLabel(flight.internalApprovalStatus||'pending')+(flight.internalApprovalReviewedBy?' · reviewed by '+flight.internalApprovalReviewedBy:'')+(flight.internalApprovalReviewedAt?' · '+new Date(flight.internalApprovalReviewedAt).toLocaleString():'');
+    document.getElementById('team-review-notes').value='';
+    document.getElementById('authority-review-current').textContent='Current status: '+statusLabel(flight.authorityClearanceStatus||'not-requested')+(flight.authorityName?' · '+flight.authorityName:'')+(flight.authorityReference?' · reference '+flight.authorityReference:'')+(flight.authorityRecordedBy?' · recorded by '+flight.authorityRecordedBy:'')+(flight.authorityRecordedAt?' · '+new Date(flight.authorityRecordedAt).toLocaleString():'');
+    document.getElementById('authority-status-select').value=flight.authorityClearanceStatus||'not-requested';
+    document.getElementById('authority-name-input').value=flight.authorityName||'';
+    document.getElementById('authority-reference-input').value=flight.authorityReference||'';
+    document.getElementById('authority-valid-until-input').value=flight.authorityValidUntil?String(flight.authorityValidUntil).slice(0,10):'';
+    document.getElementById('authority-notes-input').value='';
+    try{
+      var reviewRecord=await api('/api/flights/'+encodeURIComponent(flightId)+'/review-record');
+      document.getElementById('team-review-notes').value=reviewRecord.internalApprovalNotes||'';
+      document.getElementById('authority-notes-input').value=reviewRecord.authorityNotes||'';
+      document.getElementById('flight-review-overlay').classList.remove('hidden');
+    }catch(error){showToast(error.message,true);}
+  };
+  var toastTimer=null;
+  function showToast(message,isConflict){var el=document.getElementById('toast');el.innerHTML='<span class="toast-dot"></span><span>'+esc(message)+'</span>';el.className='toast'+(isConflict?' conflict-toast':'');clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.className='toast hidden';},3400);}
+  function setFlash(id){state.flashIds=[id];render();setTimeout(function(){state.flashIds=[];render();},2000);}
+  function setSyncStatus(value){document.getElementById('sync-status').textContent=value;}
+  var accountOverlay=document.getElementById('account-modal-overlay'),accountMode='login';
+  function openAccountModal(mode){
+    accountMode=mode||'login';
+    var signup=accountMode==='signup';
+    var forgot=accountMode==='forgot';
+    var reset=accountMode==='reset';
+    var verifying=accountMode==='verify';
+    var invited=signup&&Boolean(state.inviteToken&&state.inviteDetails);
+    document.getElementById('account-modal-title').textContent=reset?'Reset your password':(verifying?'Verify your email':(invited?'Join '+state.inviteDetails.organizationName:(signup?'Create your operator account':'Sign in to SkyLedger')));
+    document.getElementById('account-modal-sub').textContent=reset?'Choose a new password to finish securing your account.':(verifying?'Enter the code sent to your registration email.':(invited?'Create your account to join as '+state.inviteDetails.role+'.':(signup?'Set up your organization and keep its flight plans in one place.':'Access your organization’s flight plans from any device.')));
+    document.getElementById('invite-context').hidden=!invited;
+    document.getElementById('invite-context').textContent=invited?'Invitation for '+state.inviteDetails.email+' · expires '+new Date(state.inviteDetails.expiresAt).toLocaleDateString():'';
+    document.getElementById('account-mode-control').hidden=forgot||reset||verifying;
+    document.getElementById('account-organization-field').hidden=!signup||invited;
+    document.getElementById('account-name-field').hidden=!signup;
+    document.getElementById('account-organization').required=signup&&!invited;
+    document.getElementById('account-name-input').required=signup;
+    document.getElementById('account-email-field').hidden=reset;
+    document.getElementById('account-email').required=!reset;
+    document.getElementById('account-email').readOnly=verifying;
+    document.getElementById('account-password-field').hidden=forgot||verifying;
+    document.getElementById('account-password').required=!forgot&&!verifying;
+    document.getElementById('account-password').setAttribute('autocomplete',reset?'new-password':(signup?'new-password':'current-password'));
+    document.getElementById('account-password-confirm-field').hidden=!reset;
+    document.getElementById('account-password-confirm').required=reset;
+    document.getElementById('account-verification-code-field').hidden=!verifying;
+    document.getElementById('account-verification-code').required=verifying;
+    document.getElementById('account-verification-code').value='';
+    document.getElementById('email-verification-resend').hidden=!verifying;
+    document.getElementById('password-hint').hidden=!(signup||reset);
+    document.getElementById('forgot-password-btn').hidden=signup||forgot||reset||verifying;
+    document.getElementById('account-submit-btn').textContent=signup?'Create account':(verifying?'Verify email':(forgot?'Send reset link':(reset?'Update password':'Sign in')));
+    document.getElementById('account-submit-btn').disabled=false;
+    document.getElementById('login-mode-btn').classList.toggle('active',!signup&&!forgot&&!reset&&!verifying);
+    document.getElementById('signup-mode-btn').classList.toggle('active',signup);
+    document.getElementById('account-form-error').hidden=true;
+    document.getElementById('account-reset-status').hidden=true;
+    setPasswordVisible(false);
+    accountOverlay.classList.remove('hidden');
+    if(invited)document.getElementById('account-email').value=state.inviteDetails.email;
+    if(forgot){document.getElementById('account-email').focus();}
+    else if(verifying){document.getElementById('account-verification-code').focus();}
+    else if(reset){document.getElementById('account-password').focus();}
+    else document.getElementById(signup&&!invited?'account-organization':(signup?'account-name-input':'account-email')).focus();
+  }
+  function setPasswordVisible(visible){
+    var input=document.getElementById('account-password'),button=document.getElementById('password-toggle');
+    input.type=visible?'text':'password';button.setAttribute('aria-pressed',String(visible));
+    button.setAttribute('aria-label',visible?'Hide password':'Show password');button.title=visible?'Hide password':'Show password';
+    button.innerHTML=visible?EYE_OFF_ICON:EYE_ICON;
+    var confirmInput=document.getElementById('account-password-confirm'),confirmButton=document.getElementById('password-confirm-toggle');
+    if(confirmInput&&confirmButton){confirmInput.type=visible?'text':'password';confirmButton.setAttribute('aria-pressed',String(visible));confirmButton.setAttribute('aria-label',visible?'Hide new password':'Show new password');confirmButton.title=visible?'Hide new password':'Show new password';confirmButton.innerHTML=visible?EYE_OFF_ICON:EYE_ICON;}
+  }
+  function closeAccountModal(){accountOverlay.classList.add('hidden');document.getElementById('account-form').reset();document.getElementById('account-form-error').hidden=true;document.getElementById('account-reset-status').hidden=true;setPasswordVisible(false);accountMode='login';}
+  window.openPlanCorridor=async function(slug){
+    state.current=slug;sessionStorage.setItem('skyledger-corridor',slug);document.getElementById('corridor-select').value=slug;socket.emit('corridor:join',slug);
+    try{await loadCurrent();window.scrollTo({top:0,behavior:'smooth'});}catch(error){showToast(error.message,true);}
+  };
+  window.deleteCurrentLocation=async function(){
+    if(!state.current)return;
+    var location=corridor();
+    if(!location){return;}
+    if(!confirm('Delete location “'+location.label+'”? This will remove its flight plans and airspace records.'))return;
+    try{
+      await api('/api/corridors/'+encodeURIComponent(state.current),{method:'DELETE'});
+      state.corridors=await api('/api/corridors');
+      state.current=state.corridors[0] ? state.corridors[0].slug : null;
+      sessionStorage.setItem('skyledger-corridor', state.current || '');
+      if(state.current){state.selectedDate=state.selectedDate||new Date().toISOString().slice(0,10);}
+      await loadCurrent();
+      showToast('Location deleted: '+location.label+'.',false);
+    }catch(error){showToast(error.message,true);}
+  };
+  window.openFeedback=function(id){
+    var route=state.myRoutes.find(function(item){return item._id===id;});if(!route)return;
+    state.feedbackFlightId=id;document.getElementById('feedback-modal-sub').textContent='Route '+route.id+' · '+route.from+' → '+route.to;
+    document.getElementById('actual-start').value=minToTime(route.actualStartMin==null?route.startMin:route.actualStartMin);
+    document.getElementById('actual-end').value=minToTime(route.actualEndMin==null?route.endMin:route.actualEndMin);
+    document.getElementById('flight-disruption').value=route.disruption||'none';document.getElementById('outcome-notes').value=route.outcomeNotes||'';
+    document.getElementById('feedback-modal-overlay').classList.remove('hidden');
+  };
+  window.selectCapacitySlot=function(band,startMin){
+    if(!state.user){state.pendingSlot={band:band,startMin:startMin};openAccountModal('signup');return;}
+    document.getElementById('open-modal-btn').click();
+    document.getElementById('f-band').value=band;
+    document.getElementById('f-start').value=minToTime(startMin);
+    document.getElementById('f-end').value=minToTime(startMin+30);
+  };
+  function completePendingSlot(){
+    if(!state.user||!state.pendingSlot)return;
+    var slot=state.pendingSlot;state.pendingSlot=null;
+    window.selectCapacitySlot(slot.band,slot.startMin);
+  }
+  window.proposeFix=async function(flightId,conflictFlightId){
+    try{await api('/api/flights/'+encodeURIComponent(flightId)+'/proposals',{method:'POST',body:JSON.stringify({conflictFlightId:conflictFlightId})});await loadPersonal();showToast('Schedule proposal sent for operator approval.',false);}
+    catch(error){showToast(error.message,true);}
+  };
+  window.changeTeamRole=async function(memberId,role){
+    try{await api('/api/me/team/'+encodeURIComponent(memberId)+'/role',{method:'PATCH',body:JSON.stringify({role:role})});await loadTeam();showToast('Team role updated.',false);}
+    catch(error){showToast(error.message,true);await loadTeam().catch(function(){});}
+  };
+  window.removeTeamMember=async function(memberId){
+    if(!confirm('Remove this member from the organization? They will lose access to team plans.'))return;
+    try{await api('/api/me/team/'+encodeURIComponent(memberId),{method:'DELETE'});await loadTeam();showToast('Team member removed.',false);}
+    catch(error){showToast(error.message,true);}
+  };
+  window.revokeTeamInvite=async function(inviteId){
+    try{await api('/api/me/team/invitations/'+encodeURIComponent(inviteId),{method:'DELETE'});await loadTeam();showToast('Invitation revoked.',false);}
+    catch(error){showToast(error.message,true);}
+  };
+  window.markNotificationRead=async function(notificationId){
+    try{await api('/api/me/notifications/'+encodeURIComponent(notificationId)+'/read',{method:'PATCH'});await loadNotifications();}
+    catch(error){showToast(error.message,true);}
+  };
+  window.reviewAirspace=async function(slug,zoneId,decision){
+    var sourceType=document.getElementById('review-source-type').value,reviewNotes=document.getElementById('airspace-review-notes').value;
+    try{
+      await api('/api/corridors/'+encodeURIComponent(slug)+'/airspace/'+encodeURIComponent(zoneId)+'/review',{method:'PATCH',body:JSON.stringify({decision:decision,sourceType:sourceType,reviewNotes:reviewNotes})});
+      document.getElementById('airspace-review-notes').value='';await loadAirspaceReview();
+      if(slug===state.current){state.airspace=await api('/api/corridors/'+encodeURIComponent(slug)+'/airspace');renderCorridorMap();}
+      showToast(decision==='approve'?'Source reviewed and overlay published.':'Airspace submission rejected.',false);
+    }catch(error){showToast(error.message,true);}
+  };
+  window.archiveAircraft=async function(id){
+    if(!confirm('Archive this aircraft from your active fleet? Existing plans will keep its details.'))return;
+    try{await api('/api/me/aircraft/'+encodeURIComponent(id),{method:'DELETE'});await loadFleet();showToast('Aircraft archived.',false);}
+    catch(error){showToast(error.message,true);}
+  };
+  window.respondProposal=async function(proposalId,decision){
+    try{await api('/api/proposals/'+encodeURIComponent(proposalId)+'/respond',{method:'POST',body:JSON.stringify({decision:decision})});await loadCurrent();showToast(decision==='accept'?'Proposal accepted; corridor schedule updated.':'Proposal declined.',false);}
+    catch(error){showToast(error.message,true);await loadPersonal().catch(function(){});}
+  };
+
+  window.applyFix=async function(id){
+    try{var result=await api('/api/flights/'+encodeURIComponent(id)+'/apply-fix',{method:'POST'});await loadCurrent();setFlash(id);showToast('Route '+result.flight.id+' updated — conflict resolved.',false);}
+    catch(error){showToast(error.message,true);await loadCurrent().catch(function(){});}
+  };
+  window.removeOfflineDraft=async function(id){
+    var draft=state.drafts.find(function(item){return item.clientRequestId===id;});
+    if(!draft||!state.user||draft.userId!==state.user.id)return;
+    await writeOfflineDraft(draft,true);state.drafts=await readOfflineDrafts();renderOfflineDrafts();
+  };
+  window.cancelRoute=async function(id){
+    var route=state.routes.concat(state.myRoutes).find(function(item){return item._id===id;});if(!route)return;
+    if(!confirm('Cancel Route '+route.id+' ('+route.from+' → '+route.to+')? This can\'t be undone.'))return;
+    try{await api('/api/flights/'+encodeURIComponent(id),{method:'DELETE'});await loadCurrent();showToast('Route '+route.id+' cancelled.',false);}
+    catch(error){showToast(error.message,true);}
+  };
+
+  var overlay=document.getElementById('modal-overlay');
+  document.getElementById('open-modal-btn').addEventListener('click',function(){if(!state.user){openAccountModal('signup');return;}document.getElementById('modal-corridor-name').textContent=(corridor()||{}).label||'';document.getElementById('f-operator').value=state.user.organizationName||state.user.name;document.getElementById('f-date').value=localDateString();resetDraftRoute();overlay.classList.remove('hidden');document.getElementById('f-operator').focus();setTimeout(function(){if(flightMap)flightMap.invalidateSize();},0);});
+  document.getElementById('cancel-btn').addEventListener('click',closeModal);
+  overlay.addEventListener('click',function(event){if(event.target===overlay)closeModal();});
+  document.addEventListener('keydown',function(event){if(event.key==='Escape'&&!overlay.classList.contains('hidden'))closeModal();});
+  function closeModal(){overlay.classList.add('hidden');document.getElementById('flight-form').reset();resetDraftRoute();}
+  document.getElementById('clear-waypoints-btn').addEventListener('click',resetDraftRoute);
+  ['from','to'].forEach(function(endpoint){
+    document.getElementById('f-'+endpoint).addEventListener('input',function(){clearRouteEndpoint(endpoint);});
+    document.getElementById('f-'+endpoint+'-search').addEventListener('click',function(){searchRoutePlace(endpoint);});
+  });
+  ['f-aircraft','f-start','f-end'].forEach(function(id){document.getElementById(id).addEventListener('change',updateEnduranceWarning);});
+  document.getElementById('add-waypoint-btn').addEventListener('click',function(){
+    var lat=Number(document.getElementById('waypoint-lat').value),lng=Number(document.getElementById('waypoint-lng').value);
+    if(addDraftWaypoint(lat,lng)){document.getElementById('waypoint-lat').value='';document.getElementById('waypoint-lng').value='';}
+  });
+  document.getElementById('use-device-location-btn').addEventListener('click',function(){
+    var button=this;
+    if(!navigator.geolocation){showToast('Device location is not available in this browser.',true);return;}
+    if(draftRoutePoints().length>=20){showToast('A flight plan can have up to 20 route waypoints.',true);return;}
+    button.disabled=true;button.textContent='Getting location…';
+    navigator.geolocation.getCurrentPosition(function(position){
+      var latitude=Number(position.coords.latitude.toFixed(6)),longitude=Number(position.coords.longitude.toFixed(6));
+      if(addDraftWaypoint(latitude,longitude)){
+        document.getElementById('waypoint-lat').value=String(latitude);
+        document.getElementById('waypoint-lng').value=String(longitude);
+        if(flightMap)flightMap.setView([latitude,longitude],Math.max(flightMap.getZoom(),12));
+        showToast('Device location added as waypoint '+state.draftWaypoints.length+'.',false);
+      }
+      button.disabled=false;button.textContent='Use my location';
+    },function(error){
+      var message=error.code===1?'Location permission was denied. Allow access in your browser and try again.':(error.code===2?'Your device could not determine its location. Try again or enter coordinates.':'Location request timed out. Try again or enter coordinates.');
+      showToast(message,true);button.disabled=false;button.textContent='Use my location';
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+  });
+  document.getElementById('flight-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    if(!state.user){openAccountModal('signup');return;}
+    var start=timeToMin(document.getElementById('f-start').value),end=timeToMin(document.getElementById('f-end').value);
+    if(end<=start){alert('End time must be after start time.');return;}
+    var routeWaypoints=draftRoutePoints();
+    if(routeWaypoints.length<2){showToast('Select coordinates for From and To or add at least two route waypoints.',true);return;}
+    var startBattery=document.getElementById('f-battery-start').value,reserveBattery=document.getElementById('f-battery-reserve').value;
+    var body={clientRequestId:newRequestId(),operator:document.getElementById('f-operator').value,ncaaId:document.getElementById('f-ncaa').value.trim(),from:document.getElementById('f-from').value,to:document.getElementById('f-to').value,payload:document.getElementById('f-payload').value,band:document.getElementById('f-band').value,flightDate:document.getElementById('f-date').value,waypoints:routeWaypoints,aircraftId:document.getElementById('f-aircraft').value||null,payloadDetails:document.getElementById('f-payload-details').value.trim(),batteryStartPercent:startBattery===''?null:Number(startBattery),batteryReservePercent:reserveBattery===''?null:Number(reserveBattery),contingencyPlan:document.getElementById('f-contingency').value.trim(),startMin:start,endMin:end};
+    try{
+      var result=await api('/api/corridors/'+encodeURIComponent(state.current)+'/flights',{method:'POST',body:JSON.stringify(body)});
+      closeModal();await loadCurrent();setFlash(result.flight._id);
+      showToast(result.flight.isConflict?'Flight plan submitted — conflict detected on Route '+result.flight.id+'.':'Flight plan submitted — Route '+result.flight.id+' is clear.',result.flight.isConflict);
+      setTimeout(function(){var row=document.querySelector('.route-row:last-child');if(row)row.scrollIntoView({behavior:'smooth',block:'center'});},60);
+    }catch(error){
+      if(state.user&&(!navigator.onLine||error instanceof TypeError)){
+        var draft={clientRequestId:body.clientRequestId,userId:state.user.id,slug:state.current,corridorLabel:(corridor()||{}).label||state.current,body:body};
+        try{await writeOfflineDraft(draft,false);state.drafts=await readOfflineDrafts();closeModal();renderOfflineDrafts();setSyncStatus('Offline · plan saved on this device');showToast('Plan saved on this device. It will sync when connection returns.',false);}
+        catch(storageError){showToast('Could not save this offline plan on this device.',true);}
+      }else showToast(error.message,true);
+    }
+  });
+  document.getElementById('sign-in-btn').addEventListener('click',function(){openAccountModal('login');});
+  document.getElementById('account-cancel-btn').addEventListener('click',function(){state.pendingSlot=null;closeAccountModal();});
+  document.getElementById('login-mode-btn').addEventListener('click',function(){openAccountModal('login');});
+  document.getElementById('signup-mode-btn').addEventListener('click',function(){openAccountModal('signup');});
+  document.getElementById('forgot-password-btn').addEventListener('click',function(){openAccountModal('forgot');});
+  document.getElementById('email-verification-resend').addEventListener('click',async function(){
+    var email=document.getElementById('account-email').value.trim().toLowerCase(),button=this,resetStatus=document.getElementById('account-reset-status'),errorMessage=document.getElementById('account-form-error');
+    button.disabled=true;errorMessage.hidden=true;resetStatus.hidden=true;
+    try{
+      await api('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({email:email})});
+      resetStatus.textContent='If an unverified account exists for this email, a code has been sent. Use the latest code; recently sent codes may take one minute before they can be resent.';
+      resetStatus.hidden=false;
+    }catch(error){errorMessage.textContent=error.message;errorMessage.hidden=false;}
+    finally{button.disabled=false;}
+  });
+  document.getElementById('password-toggle').addEventListener('click',function(){setPasswordVisible(document.getElementById('account-password').type==='password');});
+  document.getElementById('password-confirm-toggle').addEventListener('click',function(){setPasswordVisible(document.getElementById('account-password-confirm').type==='password');});
+  document.getElementById('account-form').addEventListener('input',function(){document.getElementById('account-form-error').hidden=true;});
+  accountOverlay.addEventListener('click',function(event){if(event.target===accountOverlay){state.pendingSlot=null;closeAccountModal();}});
+  document.getElementById('account-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    var signup=accountMode==='signup',forgot=accountMode==='forgot',reset=accountMode==='reset',verifying=accountMode==='verify';
+    var submitButton=document.getElementById('account-submit-btn'),errorMessage=document.getElementById('account-form-error'),resetStatus=document.getElementById('account-reset-status');
+    if(forgot){
+      var forgotEmail=document.getElementById('account-email').value.trim().toLowerCase();
+      if(!forgotEmail){errorMessage.textContent='Enter your email address.';errorMessage.hidden=false;return;}
+      submitButton.disabled=true;submitButton.textContent='Sending…';errorMessage.hidden=true;resetStatus.hidden=true;
+      try{
+        await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:forgotEmail})});
+        resetStatus.textContent='If an account exists for that email, we just sent a secure reset link.';
+        resetStatus.hidden=false;
+        document.getElementById('account-email').value='';
+      }catch(error){errorMessage.textContent=error.message;errorMessage.hidden=false;}
+      finally{submitButton.disabled=false;submitButton.textContent='Send reset link';}
+      return;
+    }
+    if(verifying){
+      var verifyBody={email:document.getElementById('account-email').value.trim().toLowerCase(),code:document.getElementById('account-verification-code').value.trim()};
+      submitButton.disabled=true;submitButton.textContent='Verifying…';errorMessage.hidden=true;resetStatus.hidden=true;
+      try{
+        await api('/api/auth/verify-email',{method:'POST',body:JSON.stringify(verifyBody)});
+        openAccountModal('login');
+        document.getElementById('account-email').value=verifyBody.email;
+        resetStatus.textContent='Email verified successfully. You can sign in now.';
+        resetStatus.hidden=false;
+        showToast('Email verified successfully.',false);
+      }catch(error){errorMessage.textContent=error.message;errorMessage.hidden=false;}
+      finally{submitButton.disabled=false;submitButton.textContent=accountMode==='verify'?'Verify email':'Sign in';}
+      return;
+    }
+    var body={email:document.getElementById('account-email').value,password:document.getElementById('account-password').value};
+    if(signup){body.organizationName=document.getElementById('account-organization').value;body.name=document.getElementById('account-name-input').value;}
+    if(signup&&state.inviteToken)body.inviteToken=state.inviteToken;
+    if(reset){
+      var confirmPassword=document.getElementById('account-password-confirm').value;
+      if(body.password!==confirmPassword){errorMessage.textContent='Passwords do not match.';errorMessage.hidden=false;return;}
+      body.token=state.resetToken;
+      body.newPassword=body.password;
+      delete body.password;
+      submitButton.disabled=true;submitButton.textContent='Updating password…';errorMessage.hidden=true;resetStatus.hidden=true;
+      try{
+        var result=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify(body)});
+        state.user=result.user;sessionStorage.setItem('skyledger-user',JSON.stringify(state.user));state.resetToken='';state.inviteToken='';state.inviteDetails=null;history.replaceState({},'',location.pathname);closeAccountModal();socket.disconnect();socket.connect();await Promise.all([loadCurrent(),loadFleet(),loadTeam(),loadNotifications()]);completePendingSlot();showToast('Password updated. You are signed in.',false);
+      }catch(error){errorMessage.textContent=error.message;errorMessage.hidden=false;}
+      finally{submitButton.disabled=false;submitButton.textContent='Update password';}
+      return;
+    }
+    submitButton.disabled=true;submitButton.textContent=signup?'Creating account…':'Signing in…';errorMessage.hidden=true;
+    try{
+      var result=await api('/api/auth/'+(signup?'signup':'login'),{method:'POST',body:JSON.stringify(body)});
+      if(signup&&result.requiresVerification){
+        state.user=null;sessionStorage.removeItem('skyledger-user');state.inviteToken='';state.inviteDetails=null;history.replaceState({},'',location.pathname);
+        openAccountModal('verify');
+        document.getElementById('account-email').value=body.email;
+        resetStatus.textContent=result.emailStatus==='sent' ? 'We sent a six-digit verification code to your email. It expires in 15 minutes.' : 'We could not send the code. Check the mail configuration and use Resend verification code.';
+        resetStatus.hidden=false;
+        showToast('Account created — verify your email before signing in.',false);
+        return;
+      }
+      state.user=result.user;sessionStorage.setItem('skyledger-user',JSON.stringify(state.user));state.inviteToken='';state.inviteDetails=null;history.replaceState({},'',location.pathname);closeAccountModal();socket.disconnect();socket.connect();await Promise.all([loadCurrent(),loadFleet(),loadTeam(),loadNotifications()]);completePendingSlot();showToast(signup?'Account created. Your flight plans are ready to track.':'Signed in.',false);
+    }catch(error){
+      if(!signup&&error.message==='Please verify your email before signing in.'){
+        openAccountModal('verify');
+        document.getElementById('account-email').value=body.email;
+        try{
+          await api('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({email:body.email})});
+          resetStatus.textContent='If this account is still unverified, a six-digit code has been sent. Enter it below.';
+        }catch(resendError){resetStatus.textContent='Could not request a verification code. Use Resend verification code to try again.';}
+        resetStatus.hidden=false;
+      }else{errorMessage.textContent=error.message;errorMessage.hidden=false;}
+    }
+    finally{submitButton.disabled=false;submitButton.textContent=accountMode==='verify'?'Verify email':(signup?'Create account':'Sign in');}
+  });
+  document.getElementById('sign-out-btn').addEventListener('click',async function(){
+    try{await api('/api/auth/logout',{method:'POST'});closeProfilePage();state.user=null;state.profile=null;sessionStorage.removeItem('skyledger-user');state.myRoutes=[];state.proposals=[];state.aircraft=[];state.team=null;state.notifications=[];socket.disconnect();socket.connect();render();showToast('Signed out.',false);}
+    catch(error){showToast(error.message,true);}
+  });
+  var corridorOverlay=document.getElementById('corridor-modal-overlay');
+  document.getElementById('new-corridor-btn').addEventListener('click',function(){if(!state.user){openAccountModal('signup');return;}corridorOverlay.classList.remove('hidden');document.getElementById('corridor-label-input').focus();});
+  document.getElementById('delete-corridor-btn').addEventListener('click',window.deleteCurrentLocation);
+  document.getElementById('corridor-cancel-btn').addEventListener('click',function(){corridorOverlay.classList.add('hidden');document.getElementById('corridor-form').reset();});
+  corridorOverlay.addEventListener('click',function(event){if(event.target===corridorOverlay){corridorOverlay.classList.add('hidden');document.getElementById('corridor-form').reset();}});
+  document.getElementById('corridor-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    try{
+      var result=await api('/api/corridors',{method:'POST',body:JSON.stringify({label:document.getElementById('corridor-label-input').value})});
+      corridorOverlay.classList.add('hidden');document.getElementById('corridor-form').reset();
+      state.corridors=await api('/api/corridors');state.current=result.slug;renderCorridorSelect();socket.emit('corridor:join',state.current);await loadCurrent();showToast('Location created: '+result.label+'.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+  var fleetOverlay=document.getElementById('fleet-modal-overlay');
+  document.getElementById('manage-aircraft-btn').addEventListener('click',async function(){fleetOverlay.classList.remove('hidden');try{await loadFleet();}catch(error){showToast(error.message,true);}});
+  document.getElementById('fleet-close-btn').addEventListener('click',function(){fleetOverlay.classList.add('hidden');document.getElementById('fleet-form').reset();});
+  fleetOverlay.addEventListener('click',function(event){if(event.target===fleetOverlay){fleetOverlay.classList.add('hidden');document.getElementById('fleet-form').reset();}});
+  document.getElementById('fleet-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    var body={name:document.getElementById('aircraft-name').value,manufacturer:document.getElementById('aircraft-manufacturer').value,model:document.getElementById('aircraft-model').value,registration:document.getElementById('aircraft-registration').value,enduranceMin:Number(document.getElementById('aircraft-endurance').value)};
+    try{var aircraft=await api('/api/me/aircraft',{method:'POST',body:JSON.stringify(body)});await loadFleet();document.getElementById('f-aircraft').value=aircraft.id;document.getElementById('fleet-form').reset();showToast('Aircraft saved to your fleet.',false);}
+    catch(error){showToast(error.message,true);}
+  });
+  var feedbackOverlay=document.getElementById('feedback-modal-overlay');
+  document.getElementById('feedback-cancel-btn').addEventListener('click',function(){feedbackOverlay.classList.add('hidden');});
+  feedbackOverlay.addEventListener('click',function(event){if(event.target===feedbackOverlay)feedbackOverlay.classList.add('hidden');});
+  document.getElementById('feedback-form').addEventListener('submit',async function(event){
+    event.preventDefault();var start=timeToMin(document.getElementById('actual-start').value),end=timeToMin(document.getElementById('actual-end').value);
+    if(end<=start){showToast('Actual arrival must be after departure.',true);return;}
+    var body={actualStartMin:start,actualEndMin:end,disruption:document.getElementById('flight-disruption').value,outcomeNotes:document.getElementById('outcome-notes').value};
+    try{await api('/api/flights/'+encodeURIComponent(state.feedbackFlightId)+'/feedback',{method:'POST',body:JSON.stringify(body)});feedbackOverlay.classList.add('hidden');await loadCurrent();showToast('Post-flight report saved.',false);}
+    catch(error){showToast(error.message,true);}
+  });
+  var airspaceOverlay=document.getElementById('airspace-modal-overlay');
+  document.getElementById('add-airspace-btn').addEventListener('click',function(){if(!state.user)return;document.getElementById('airspace-date').value=localDateString();airspaceOverlay.classList.remove('hidden');});
+  document.getElementById('airspace-cancel-btn').addEventListener('click',function(){airspaceOverlay.classList.add('hidden');document.getElementById('airspace-form').reset();});
+  airspaceOverlay.addEventListener('click',function(event){if(event.target===airspaceOverlay){airspaceOverlay.classList.add('hidden');document.getElementById('airspace-form').reset();}});
+  document.getElementById('airspace-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    var geometry;
+    try{geometry=JSON.parse(document.getElementById('airspace-geojson').value);}catch(error){showToast('Enter valid GeoJSON for the airspace area.',true);return;}
+    var body={name:document.getElementById('airspace-name').value,category:document.getElementById('airspace-category').value,sourceName:document.getElementById('airspace-source').value,sourceUrl:document.getElementById('airspace-url').value,sourceCheckedAt:document.getElementById('airspace-date').value,geometry:geometry};
+    try{await api('/api/corridors/'+encodeURIComponent(state.current)+'/airspace',{method:'POST',body:JSON.stringify(body)});airspaceOverlay.classList.add('hidden');document.getElementById('airspace-form').reset();showToast('Airspace source submitted for review.',false);if(state.user&&state.user.canReviewAirspace)await loadAirspaceReview();}
+    catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('profile-nav-btn').addEventListener('click',function(){
+    if(document.body.classList.contains('profile-view'))closeProfilePage();
+    else openProfilePage();
+  });
+  document.getElementById('profile-back-btn').addEventListener('click',closeProfilePage);
+  document.querySelectorAll('[data-profile-tab]').forEach(function(button){
+    button.addEventListener('click',function(){setProfileTab(button.getAttribute('data-profile-tab'));});
+  });
+  document.getElementById('profile-form').addEventListener('submit',async function(event){
+    event.preventDefault();
+    var body={name:document.getElementById('profile-name-input').value};
+    var organizationInput=document.getElementById('profile-org-input');
+    if(!organizationInput.disabled)body.organizationName=organizationInput.value;
+    var saveButton=document.getElementById('profile-save-btn'),errorBox=document.getElementById('profile-form-error'),status=document.getElementById('profile-status');
+    saveButton.disabled=true;saveButton.textContent='Saving…';errorBox.hidden=true;status.hidden=true;
+    try{
+      state.profile=await api('/api/me/profile',{method:'PATCH',body:JSON.stringify(body)});
+      state.user=Object.assign({},state.user,{name:state.profile.user.name,organizationName:state.profile.organization.name,emailVerified:state.profile.user.emailVerified});
+      sessionStorage.setItem('skyledger-user',JSON.stringify(state.user));
+      renderAccount();renderProfile();
+      status.textContent='Profile settings saved.';status.hidden=false;
+      showToast('Profile settings saved.',false);
+    }catch(error){errorBox.textContent=error.message;errorBox.hidden=false;}
+    finally{saveButton.disabled=false;saveButton.textContent='Save settings';}
+  });
+  document.getElementById('profile-reset-password-btn').addEventListener('click',async function(){
+    if(!state.profile||!state.profile.user.emailVerified)return;
+    try{
+      await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:state.profile.user.email})});
+      showToast('If your account is eligible, a password reset link has been sent.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+  var deleteAccountForm=document.getElementById('delete-account-form');
+  document.getElementById('delete-account-open-btn').addEventListener('click',function(){
+    deleteAccountForm.hidden=false;
+    document.getElementById('delete-account-password').focus();
+  });
+  document.getElementById('delete-account-cancel-btn').addEventListener('click',function(){
+    deleteAccountForm.reset();deleteAccountForm.hidden=true;document.getElementById('delete-account-error').hidden=true;
+  });
+  deleteAccountForm.addEventListener('submit',async function(event){
+    event.preventDefault();
+    var body={password:document.getElementById('delete-account-password').value};
+    var transferWrap=document.getElementById('delete-transfer-wrap');
+    if(!transferWrap.hidden)body.transferToUserId=document.getElementById('delete-transfer-select').value;
+    var submitButton=document.getElementById('delete-account-submit-btn'),errorBox=document.getElementById('delete-account-error');
+    submitButton.disabled=true;submitButton.textContent='Deleting…';errorBox.hidden=true;
+    try{
+      await api('/api/me/profile',{method:'DELETE',body:JSON.stringify(body)});
+      state.user=null;state.profile=null;state.myRoutes=[];state.proposals=[];state.aircraft=[];state.team=null;state.notifications=[];
+      sessionStorage.removeItem('skyledger-user');
+      deleteAccountForm.reset();deleteAccountForm.hidden=true;closeProfilePage();
+      socket.disconnect();socket.connect();render();showToast('Account deleted. Historical flight records remain in the ledger.',false);
+    }catch(error){errorBox.textContent=error.message;errorBox.hidden=false;}
+    finally{submitButton.disabled=false;submitButton.textContent='Permanently delete account';}
+  });
+  var teamOverlay=document.getElementById('team-modal-overlay'),notificationsOverlay=document.getElementById('notifications-modal-overlay'),reviewOverlay=document.getElementById('airspace-review-overlay');
+  document.getElementById('team-btn').addEventListener('click',async function(){teamOverlay.classList.remove('hidden');try{await loadTeam();}catch(error){showToast(error.message,true);}});
+  document.getElementById('team-close-btn').addEventListener('click',function(){teamOverlay.classList.add('hidden');});
+  teamOverlay.addEventListener('click',function(event){if(event.target===teamOverlay)teamOverlay.classList.add('hidden');});
+  document.getElementById('team-invite-form').addEventListener('submit',async function(event){
+    event.preventDefault();var errorBox=document.getElementById('invite-error');errorBox.hidden=true;document.getElementById('invite-link-wrap').hidden=true;
+    try{
+      var result=await api('/api/me/team/invitations',{method:'POST',body:JSON.stringify({email:document.getElementById('invite-email').value,role:document.getElementById('invite-role').value})});
+      document.getElementById('invite-email').value='';await loadTeam();
+      if(result.invitationLink){document.getElementById('invite-link').innerHTML='<a href="'+esc(result.invitationLink)+'">'+esc(result.invitationLink)+'</a>';document.getElementById('invite-link-wrap').hidden=false;}
+      showToast(result.emailStatus==='sent'?'Invitation emailed.':'Invite created; share the generated link.',false);
+    }catch(error){errorBox.textContent=error.message;errorBox.hidden=false;}
+  });
+  document.getElementById('notifications-btn').addEventListener('click',async function(){notificationsOverlay.classList.remove('hidden');try{await loadNotifications();}catch(error){showToast(error.message,true);}});
+  document.getElementById('notifications-close-btn').addEventListener('click',function(){notificationsOverlay.classList.add('hidden');});
+  notificationsOverlay.addEventListener('click',function(event){if(event.target===notificationsOverlay)notificationsOverlay.classList.add('hidden');});
+  document.getElementById('mark-all-read-btn').addEventListener('click',async function(){
+    try{await api('/api/me/notifications/read-all',{method:'PATCH'});await loadNotifications();}
+    catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('airspace-review-btn').addEventListener('click',async function(){reviewOverlay.classList.remove('hidden');try{await loadAirspaceReview();}catch(error){showToast(error.message,true);}});
+  document.getElementById('airspace-review-close-btn').addEventListener('click',function(){reviewOverlay.classList.add('hidden');});
+  reviewOverlay.addEventListener('click',function(event){if(event.target===reviewOverlay)reviewOverlay.classList.add('hidden');});
+  var flightReviewOverlay=document.getElementById('flight-review-overlay');
+  document.getElementById('flight-review-close-btn').addEventListener('click',function(){flightReviewOverlay.classList.add('hidden');});
+  flightReviewOverlay.addEventListener('click',function(event){if(event.target===flightReviewOverlay)flightReviewOverlay.classList.add('hidden');});
+  document.getElementById('team-approve-btn').addEventListener('click',async function(){
+    try{
+      await api('/api/flights/'+encodeURIComponent(state.reviewFlightId)+'/internal-approval',{method:'PATCH',body:JSON.stringify({status:'approved',notes:document.getElementById('team-review-notes').value})});
+      flightReviewOverlay.classList.add('hidden');await loadCurrent();showToast('Internal team approval recorded. This is not authority clearance.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('team-reject-btn').addEventListener('click',async function(){
+    try{
+      await api('/api/flights/'+encodeURIComponent(state.reviewFlightId)+'/internal-approval',{method:'PATCH',body:JSON.stringify({status:'rejected',notes:document.getElementById('team-review-notes').value})});
+      flightReviewOverlay.classList.add('hidden');await loadCurrent();showToast('Flight plan rejected for team operations.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('authority-record-btn').addEventListener('click',async function(){
+    try{
+      var authorityBody={status:document.getElementById('authority-status-select').value,authorityName:document.getElementById('authority-name-input').value,authorityReference:document.getElementById('authority-reference-input').value,validUntil:document.getElementById('authority-valid-until-input').value||null,notes:document.getElementById('authority-notes-input').value};
+      await api('/api/flights/'+encodeURIComponent(state.reviewFlightId)+'/authority-clearance',{method:'PATCH',body:JSON.stringify(authorityBody)});
+      flightReviewOverlay.classList.add('hidden');await loadCurrent();showToast('External authority decision record saved.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('corridor-select').addEventListener('change',async function(event){
+    state.current=event.target.value;sessionStorage.setItem('skyledger-corridor',state.current);socket.emit('corridor:join',state.current);
+    try{await loadCurrent();}catch(error){showToast(error.message,true);}
+  });
+  document.getElementById('schedule-date').addEventListener('change',function(event){
+    state.selectedDate=event.target.value||localDateString();sessionStorage.setItem('skyledger-date',state.selectedDate);render();loadWeather();
+  });
+  document.getElementById('reset-btn').addEventListener('click',async function(){
+    if(!confirm('Reset the demo flight plans? Your submitted flight plans will not be affected.'))return;
+    try{
+      await Promise.all(state.corridors.map(function(item){return api('/api/corridors/'+encodeURIComponent(item.slug)+'/reset',{method:'POST'});}));
+      state.current='kaduna-northwest';document.getElementById('corridor-select').value=state.current;socket.emit('corridor:join',state.current);await loadCurrent();showToast('Demo data reset.',false);
+    }catch(error){showToast(error.message,true);}
+  });
+
+  socket.on('connect',function(){setSyncStatus('Synced across devices');if(state.current)socket.emit('corridor:join',state.current);});
+  socket.on('disconnect',function(){setSyncStatus('Reconnecting…');});
+  ['flight:created','flight:cancelled','flight:updated'].forEach(function(eventName){socket.on(eventName,function(payload){if(payload&&payload.slug===state.current){state.routes=routesFromApi(payload.flights||[]);render();if(state.user)loadPersonal().catch(function(){});}});});
+  socket.on('activity:new',function(payload){if(payload&&payload.slug===state.current){api('/api/corridors/'+encodeURIComponent(state.current)+'/activity').then(function(entries){state.activity=entries;renderActivity();}).catch(function(){});}});
+  socket.on('corridor:created',function(){api('/api/corridors').then(function(corridors){state.corridors=corridors;renderCorridorSelect();}).catch(function(){});});
+  socket.on('airspace:created',function(payload){if(payload&&payload.slug===state.current){api('/api/corridors/'+encodeURIComponent(state.current)+'/airspace').then(function(zones){state.airspace=zones;renderCorridorMap();}).catch(function(){});}});
+  socket.on('proposal:new',function(){if(state.user)loadPersonal().catch(function(){});});
+  socket.on('proposal:updated',function(){if(state.user)loadPersonal().catch(function(){});});
+  socket.on('notification:new',function(){if(state.user)loadNotifications().catch(function(){});});
+  socket.on('corridor:error',function(payload){showToast(payload.error||'Unable to join corridor.',true);});
+  window.addEventListener('offline',function(){setSyncStatus('Offline · saved plans stay on this device');});
+  window.addEventListener('online',function(){setSyncStatus('Connection restored · syncing…');syncOfflineDrafts().then(function(){return loadCurrent();}).catch(function(){});});
+  async function init(){
+    var resetToken=new URLSearchParams(location.search).get('resetToken');
+    if(resetToken){
+      state.resetToken=resetToken;
+      openAccountModal('reset');
+      try{
+        var resetCheck=await api('/api/auth/validate-reset-token/'+encodeURIComponent(resetToken));
+        if(!resetCheck.ok)throw new Error('This reset link is invalid or has expired.');
+      }catch(resetError){
+        state.resetToken='';
+        document.getElementById('account-form-error').textContent=resetError.message;
+        document.getElementById('account-form-error').hidden=false;
+        document.getElementById('account-submit-btn').disabled=true;
+      }
+    }
+    try{
+      var savedDate=sessionStorage.getItem('skyledger-date');
+      state.selectedDate=savedDate&&/^\d{4}-\d{2}-\d{2}$/.test(savedDate)?savedDate:localDateString();
+      document.getElementById('schedule-date').value=state.selectedDate;
+      var account=await api('/api/auth/me');state.user=account.user;
+      if(state.user){sessionStorage.setItem('skyledger-user',JSON.stringify(state.user));await Promise.all([loadFleet(),loadTeam(),loadNotifications()]);}
+      else sessionStorage.removeItem('skyledger-user');
+      state.corridors=await api('/api/corridors');
+      var savedCorridor=sessionStorage.getItem('skyledger-corridor');
+      state.current=state.corridors.some(function(item){return item.slug===savedCorridor;})?savedCorridor:(state.corridors.some(function(item){return item.slug==='kaduna-northwest';})?'kaduna-northwest':(state.corridors[0]||{}).slug||'');
+      renderCorridorSelect();socket.emit('corridor:join',state.current);await loadCurrent();state.drafts=await readOfflineDrafts().catch(function(){return [];});renderOfflineDrafts();
+      document.getElementById('activity-caption').textContent='Every submission, fix, and cancellation — shared live across every device viewing this ledger.';
+      await syncOfflineDrafts();
+      if(state.user&&state.user.canReviewAirspace)await loadAirspaceReview();
+      var verifyEmailToken=new URLSearchParams(location.search).get('verifyEmail');
+      if(verifyEmailToken){
+        try{
+          await api('/api/auth/verify-email',{method:'POST',body:JSON.stringify({token:verifyEmailToken})});
+          history.replaceState({},'',location.pathname);
+          openAccountModal('login');
+          document.getElementById('account-email').value='';
+          document.getElementById('account-reset-status').textContent='Email verified successfully. You can sign in now.';
+          document.getElementById('account-reset-status').hidden=false;
+          showToast('Email verified successfully.',false);
+        }catch(verifyError){showToast(verifyError.message,true);}
+      }
+      var inviteToken=new URLSearchParams(location.search).get('invite');
+      if(inviteToken&&!state.user){
+        try{
+          state.inviteToken=inviteToken;
+          state.inviteDetails=await api('/api/auth/invitations/'+encodeURIComponent(inviteToken));
+          openAccountModal('signup');
+        }catch(inviteError){state.inviteToken='';state.inviteDetails=null;showToast(inviteError.message,true);}
+      }else if(inviteToken&&state.user){
+        showToast('Sign out before accepting an invitation to another organization.',true);
+      }
+    }catch(error){
+      if(error instanceof TypeError){
+        try{
+          var cachedUser=sessionStorage.getItem('skyledger-user');state.user=cachedUser?JSON.parse(cachedUser):null;
+          var offlineDate=sessionStorage.getItem('skyledger-date');state.selectedDate=offlineDate&&/^\d{4}-\d{2}-\d{2}$/.test(offlineDate)?offlineDate:localDateString();document.getElementById('schedule-date').value=state.selectedDate;
+          state.corridors=await api('/api/corridors');var saved=sessionStorage.getItem('skyledger-corridor');
+          state.current=state.corridors.some(function(item){return item.slug===saved;})?saved:(state.corridors[0]||{}).slug||'';
+          var cachedPrefix='/api/corridors/'+encodeURIComponent(state.current);
+          var cached=await Promise.all([api(cachedPrefix+'/flights'),api(cachedPrefix+'/activity'),api(cachedPrefix+'/reliability'),api(cachedPrefix+'/airspace')]);
+          state.routes=routesFromApi(cached[0]);state.activity=cached[1];state.reliability=cached[2];state.airspace=cached[3];state.drafts=await readOfflineDrafts().catch(function(){return [];});render();
+          loadWeather();
+          setSyncStatus('Offline · public schedules cached');return;
+        }catch(offlineError){}
+      }
+      showToast(error.message,true);setSyncStatus('Connection unavailable');
+    }
+  }
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('/service-worker.js').catch(function(){});
+  initializeMaps();
+  updateFooterStatus();
+  setInterval(updateFooterStatus,60000);
+  init();
+})();
+</script>
+</body>
+</html>
