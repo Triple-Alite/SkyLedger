@@ -24,6 +24,8 @@ const io = new Server(server);
 const port = Number(process.env.PORT) || 3000;
 let sessionMiddleware = (req, res, next) => next();
 
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
 app.set('io', io);
 app.disable('x-powered-by');
 app.use((req, res, next) => sessionMiddleware(req, res, next));
