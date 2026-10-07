@@ -46,10 +46,20 @@ test('sendEmail sends messages through the Resend API', async (t) => {
 test('sendEmail reports Resend API failures', async (t) => {
   withResendConfig(t);
   const originalFetch = global.fetch;
-  global.fetch = async () => ({ ok: false, status: 401 });
+  const originalConsoleError = console.error;
+  let errorLog = '';
+  global.fetch = async () => ({
+    ok: false,
+    status: 403,
+    json: async () => ({ name: 'validation_error', message: 'The sender domain is not verified.' }),
+  });
+  console.error = (...args) => { errorLog = args.join(' '); };
   t.after(() => { global.fetch = originalFetch; });
+  t.after(() => { console.error = originalConsoleError; });
 
   assert.equal(await sendEmail({ to: 'pilot@example.com', subject: 'Test', text: 'Test' }), 'failed');
+  assert.match(errorLog, /HTTP 403/);
+  assert.match(errorLog, /The sender domain is not verified/);
 });
 
 test('sendEmail reports missing Resend configuration', async (t) => {

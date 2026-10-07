@@ -19,7 +19,19 @@ async function sendEmail({ to, subject, text }) {
     });
 
     if (!response.ok) {
-      console.error('Email delivery failed: Resend returned HTTP ' + response.status + '.');
+      let errorDetails = '';
+      try {
+        const body = await response.json();
+        const errorName = body && typeof body.name === 'string' ? body.name : '';
+        const errorMessage = body && typeof body.message === 'string' ? body.message : '';
+        errorDetails = [errorName, errorMessage].filter(Boolean).join(': ').slice(0, 500);
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
+      console.error(
+        'Email delivery failed: Resend returned HTTP ' + response.status +
+        (errorDetails ? ' (' + errorDetails + ').' : '.'),
+      );
       return 'failed';
     }
     return 'sent';
