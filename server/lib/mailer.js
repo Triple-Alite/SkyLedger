@@ -1,29 +1,27 @@
-const nodemailer = require('nodemailer');
-
-let transporter;
-
-function getTransporter() {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) return null;
-  if (!transporter) {
-    const port = Number(process.env.SMTP_PORT) || 587;
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER ? {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD || '',
-      } : undefined,
-    });
-  }
-  return transporter;
-}
+const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 
 async function sendEmail({ to, subject, text }) {
-  const mailTransport = getTransporter();
-  if (!mailTransport) return 'not-configured';
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from) {
+    console.error('Email delivery is not configured: set RESEND_API_KEY and EMAIL_FROM.');
+    return 'not-configured';
+  }
+
   try {
-    await mailTransport.sendMail({ from: process.env.SMTP_FROM, to, subject, text });
+    const response = await fetch(RESEND_EMAILS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to, subject, text }),
+    });
+
+    if (!response.ok) {
+      console.error('Email delivery failed: Resend returned HTTP ' + response.status + '.');
+      return 'failed';
+    }
     return 'sent';
   } catch (error) {
     console.error('Email delivery failed:', error.message);

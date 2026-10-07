@@ -21,7 +21,6 @@
     "express-session": "^1.18.1",
     "leaflet": "^1.9.4",
     "mongoose": "^8.9.5",
-    "nodemailer": "^10.0.14",
     "socket.io": "^4.8.1"
   }
 }
