@@ -317,22 +317,36 @@ router.post('/corridors/:slug/flights', requireAuth, requireOrganizationRole('ow
     const flights = await FlightPlan.find({ corridor: corridor._id });
     const conflicts = findConflicts(flight, flights, flight._id);
     const hasConflict = conflicts.length > 0;
-    await addActivity(
-      req.app.get('io'),
-      corridor,
-      'Route ' + flight.letter + ' submitted in ' + corridor.label + (hasConflict ? ' — conflict flagged.' : ' — clear.'),
-    );
-    await emitFlightSnapshot(req.app.get('io'), corridor.slug, 'flight:created', flight);
-    await notifyScheduleChange(
-      req.app.get('io'), flight, conflicts, req.user._id,
-      hasConflict ? 'Flight plan conflict detected' : 'Organization flight plan submitted',
-      hasConflict
-        ? 'Route ' + flight.letter + ' in ' + corridor.label + ' conflicts with one of your plans. Review the corridor schedule.'
-        : 'Route ' + flight.letter + ' was added to ' + corridor.label + ' on ' + flight.flightDate + '.',
-    );
-    const current = await loadCorridor(corridor.slug);
-    const annotated = current.annotated.find((item) => item._id === String(flight._id));
+    const annotated = {
+      ...toClientFlight(flight, corridor.slug),
+      isConflict: hasConflict,
+      conflictsWith: conflicts.map((conflict) => conflict.letter),
+      suggestedFix: hasConflict ? suggestFix(flight, flights, flight._id) : null,
+    };
     res.status(201).json({ flight: annotated });
+    const io = req.app.get('io');
+    const followUps = [
+      addActivity(
+        io,
+        corridor,
+        'Route ' + flight.letter + ' submitted in ' + corridor.label + (hasConflict ? ' — conflict flagged.' : ' — clear.'),
+      ),
+      emitFlightSnapshot(io, corridor.slug, 'flight:created', flight),
+      notifyScheduleChange(
+        io, flight, conflicts, req.user._id,
+        hasConflict ? 'Flight plan conflict detected' : 'Organization flight plan submitted',
+        hasConflict
+          ? 'Route ' + flight.letter + ' in ' + corridor.label + ' conflicts with one of your plans. Review the corridor schedule.'
+          : 'Route ' + flight.letter + ' was added to ' + corridor.label + ' on ' + flight.flightDate + '.',
+      ),
+    ];
+    Promise.allSettled(followUps).then((results) => {
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error('Flight plan follow-up task ' + (index + 1) + ' failed:', result.reason);
+        }
+      });
+    });
   } catch (error) {
     if (error.code === 11000 && req.body?.clientRequestId) {
       const corridor = await Corridor.findOne({ slug: req.params.slug }).select('_id');

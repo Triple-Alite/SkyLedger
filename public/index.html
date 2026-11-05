@@ -235,6 +235,46 @@
   .footer-dot { width:7px; height:7px; border-radius:50%; background:var(--steel); }
   .footer-health[data-state="operational"] .footer-dot { background:var(--green); }
   .footer-health[data-state="offline"] .footer-dot,.footer-health[data-state="degraded"] .footer-dot { background:#C74B35; }
+  body.presentation-mode #live-dashboard,body.presentation-mode #profile-view { display:none; }
+  body.presentation-mode .header-right > :not(#presentation-toggle-btn) { display:none; }
+  .presentation-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .presentation-kicker { color:var(--steel); font-size:11px; font-weight:750; letter-spacing:1.2px; margin:0 0 6px; text-transform:uppercase; }
+  .presentation-heading h2 { font-size:22px; margin:0 0 5px; }
+  .presentation-heading .caption { margin-bottom:0; }
+  .demo-disclaimer { display:flex; gap:9px; align-items:flex-start; padding:11px 13px; margin:18px 0; border:1px solid #E8D6A9; border-radius:9px; background:#FFFBF0; color:#684A0B; font-size:12px; line-height:1.5; }
+  .demo-disclaimer strong { white-space:nowrap; }
+  .demo-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:16px; }
+  .demo-metric { border:1px solid var(--line); border-radius:10px; padding:13px 15px; }
+  .demo-metric span { display:block; color:var(--steel); font-size:11px; font-weight:650; }
+  .demo-metric strong { display:block; margin-top:4px; font-size:23px; }
+  .demo-columns { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(270px,.85fr); gap:16px; }
+  .demo-subpanel { min-width:0; border:1px solid var(--line); border-radius:11px; padding:16px; }
+  .demo-subpanel h3 { margin:0 0 4px; font-size:14px; }
+  .demo-subpanel > p { margin:0 0 14px; color:var(--steel); font-size:11.5px; line-height:1.45; }
+  .demo-timeline { min-width:420px; }
+  .demo-lane { display:flex; align-items:stretch; min-height:40px; }
+  .demo-lane-label { width:48px; flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; padding-right:9px; color:var(--steel); font-size:10px; font-weight:700; }
+  .demo-lane-track { position:relative; flex:1; min-height:40px; border-top:1px solid var(--line); }
+  .demo-lane:last-child .demo-lane-track { border-bottom:1px solid var(--line); }
+  .demo-bar { position:absolute; display:flex; align-items:center; min-width:0; overflow:hidden; padding:0 7px; border-radius:5px; background:var(--navy-2); color:#fff; font-size:10px; font-weight:700; white-space:nowrap; }
+  .demo-bar.conflict { background:var(--amber); color:var(--navy); }
+  .demo-axis { display:flex; margin:5px 0 0 48px; color:var(--steel); font-size:9px; justify-content:space-between; }
+  .demo-conflict-list { display:grid; gap:9px; }
+  .demo-conflict-card { border:1px solid #F0D18F; border-radius:9px; padding:10px 11px; background:#FFFBF0; }
+  .demo-conflict-card strong { display:block; margin-bottom:4px; color:#704A00; font-size:12px; }
+  .demo-conflict-card p { margin:0; color:#5F5B50; font-size:11px; line-height:1.45; }
+  .demo-plan-section { margin-top:16px; }
+  .demo-table-wrap { overflow-x:auto; }
+  .demo-table { width:100%; min-width:640px; border-collapse:collapse; text-align:left; font-size:12px; }
+  .demo-table th { padding:9px 10px; background:var(--paper); color:var(--steel); font-size:10px; letter-spacing:.45px; text-transform:uppercase; }
+  .demo-table td { padding:10px; border-bottom:1px solid var(--line); }
+  .demo-flight-id { font-weight:750; }
+  .demo-status { display:inline-flex; align-items:center; border-radius:20px; padding:4px 8px; background:#EAF6ED; color:#23743A; font-size:10px; font-weight:700; white-space:nowrap; }
+  .demo-status.conflict { background:#FFF0CD; color:#765000; }
+  .demo-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; color:var(--steel); font-size:10px; }
+  .demo-legend span { display:inline-flex; align-items:center; gap:5px; }
+  .demo-legend i { width:9px; height:9px; border-radius:3px; background:var(--navy-2); }
+  .demo-legend i.conflict { background:var(--amber); }
   @media (max-width:640px) {
     header { padding:14px 16px; }
     main { padding:18px 14px 44px; }
@@ -253,6 +293,16 @@
     .waypoint-entry button { grid-column:1 / -1; }
     .context-banner { font-size:12.5px; }
     .toast { left:14px; right:14px; transform:none; max-width:none; }
+    .demo-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .demo-columns { grid-template-columns:1fr; }
+    .demo-subpanel { padding:12px; }
+    .demo-disclaimer { display:block; }
+    .demo-disclaimer strong { display:block; margin-bottom:3px; }
+  }
+  @media print {
+    body.presentation-mode header,body.presentation-mode footer,body.presentation-mode .presentation-exit { display:none !important; }
+    body.presentation-mode main { max-width:none; padding:0; }
+    body.presentation-mode #presentation-demo { border:0; box-shadow:none; }
   }
   @media (prefers-reduced-motion:no-preference) and (max-width:640px) {
     @keyframes toast-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
@@ -267,6 +317,7 @@
     </div>
     <div class="header-right">
       <select id="corridor-select" aria-label="Select corridor"></select>
+      <button id="presentation-toggle-btn" class="header-action" type="button" aria-expanded="false" aria-controls="presentation-demo">Presentation demo</button>
       <button id="new-corridor-btn" class="header-action" type="button" hidden>+ Add location</button>
       <button id="delete-corridor-btn" class="header-action" type="button" hidden>Delete location</button>
       <div class="live"><span class="live-dot"></span>LIVE</div>
@@ -341,6 +392,42 @@
         </section>
       </div>
     </section>
+    <section class="panel" id="presentation-demo" hidden aria-labelledby="presentation-title">
+      <div class="presentation-heading">
+        <div><p class="presentation-kicker">Presentation mode · Scenario</p><h2 id="presentation-title">Shared corridor operations</h2><p class="caption">Kaduna Northwest · Sample morning schedule · West Africa Time (UTC+1)</p></div>
+        <button id="presentation-exit-btn" class="btn-secondary presentation-exit" type="button">Return to live dashboard</button>
+      </div>
+      <div class="demo-disclaimer"><strong>Illustrative demo data</strong><span>These flight plans and schedule overlaps are fictional examples for presentation only. They are not live traffic, spatial conflict analysis, authority approval, or flight clearance.</span></div>
+      <div class="demo-metrics" aria-label="Demo schedule summary">
+        <div class="demo-metric"><span>Flight plans</span><strong id="demo-flight-count">8</strong></div>
+        <div class="demo-metric"><span>Potential conflicts</span><strong id="demo-conflict-count">3</strong></div>
+        <div class="demo-metric"><span>Plans to review</span><strong id="demo-affected-count">6</strong></div>
+        <div class="demo-metric"><span>Altitude bands</span><strong>4</strong></div>
+      </div>
+      <div class="demo-columns">
+        <section class="demo-subpanel" aria-labelledby="demo-timeline-title">
+          <h3 id="demo-timeline-title">Schedule overview</h3>
+          <p>Overlapping bars on the same altitude band are highlighted for review.</p>
+          <div class="grid-scroll"><div class="demo-timeline" id="demo-timeline" role="img" aria-label="Illustrative flight schedule by altitude and time"></div></div>
+          <div class="demo-legend"><span><i></i>Scheduled plan</span><span><i class="conflict"></i>Potential overlap</span></div>
+        </section>
+        <section class="demo-subpanel" aria-labelledby="demo-conflicts-title">
+          <h3 id="demo-conflicts-title">Potential conflicts</h3>
+          <p>Same-band time overlaps to review before coordinating a schedule.</p>
+          <div class="demo-conflict-list" id="demo-conflict-list"></div>
+        </section>
+      </div>
+      <section class="demo-subpanel demo-plan-section" aria-labelledby="demo-plans-title">
+        <h3 id="demo-plans-title">Flight plan ledger</h3>
+        <div class="demo-table-wrap">
+          <table class="demo-table">
+            <thead><tr><th>Plan</th><th>Operator</th><th>Route</th><th>Time</th><th>Band</th><th>Status</th></tr></thead>
+            <tbody id="demo-plan-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+    <div id="live-dashboard">
     <div class="context-banner"><span class="dot"></span><span>Nigeria's drone medical delivery network already reaches <strong>13M+ people</strong> across three states, and keeps expanding. NCAA's registration portal confirms <em>who</em> can fly — SkyLedger is where operators confirm <em>when and where</em>, so shared corridors stay conflict-free.</span></div>
     <div class="toolbar">
       <div class="stats" id="stats"></div>
@@ -383,6 +470,7 @@
     <section class="panel">
       <h2>Activity ledger</h2><p class="caption" id="activity-caption"></p><div id="activity-list"></div>
     </section>
+    </div>
   </main>
   <footer class="site-footer">
     <div class="footer-brand">SkyLedger <span>Flight coordination</span></div>
@@ -549,6 +637,21 @@
     cargo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/></svg>'
   };
   var PAYLOAD_LABEL={medical:'Medical',agriculture:'Agriculture',security:'Security',cargo:'Cargo'};
+  var DEMO_FLIGHTS=[
+    {id:'A',operator:'Nimbus Health',from:'Kaduna Hub',to:'Giwa Clinic',start:480,end:510,band:'300ft',payload:'Medical'},
+    {id:'B',operator:'Rigasa Logistics',from:'Kaduna Hub',to:'Rigasa Farms',start:495,end:520,band:'300ft',payload:'Cargo'},
+    {id:'C',operator:'Terra Watch',from:'Zaria Hub',to:'Sabon Gari',start:540,end:565,band:'400ft',payload:'Security'},
+    {id:'D',operator:'Nimbus Health',from:'Zaria Hub',to:'Giwa Clinic',start:550,end:575,band:'400ft',payload:'Medical'},
+    {id:'E',operator:'Kaduna Relief',from:'Kaduna Hub',to:'Kafanchan Clinic',start:600,end:620,band:'200ft',payload:'Medical'},
+    {id:'F',operator:'Plateau Cargo',from:'Kaduna Hub',to:'Rigasa Farms',start:605,end:630,band:'200ft',payload:'Cargo'},
+    {id:'G',operator:'Terra Survey',from:'Kaduna Hub',to:'Kachia Field',start:525,end:545,band:'500ft',payload:'Agriculture'},
+    {id:'H',operator:'Northstar Inspection',from:'Zaria Hub',to:'Sabon Gari',start:585,end:600,band:'500ft',payload:'Security'}
+  ];
+  var DEMO_CONFLICTS=[
+    {flights:['A','B'],action:'Coordinate a time change or review an alternate band.'},
+    {flights:['C','D'],action:'Coordinate the overlapping Zaria-area schedules before launch.'},
+    {flights:['E','F'],action:'Separate the overlapping Kaduna-area schedules before launch.'}
+  ];
   var CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
   var WARN_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.5 1.5 0 0 0 1.3 2.2h16.4a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z"/></svg>';
   var X_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -564,6 +667,37 @@
   function activeRoutes(){return state.routes.filter(function(route){return route.flightDate===state.selectedDate;});}
   function timeToMin(value){var parts=value.split(':');return (+parts[0])*60+(+parts[1]);}
   function minToTime(minutes){var h=Math.floor(minutes/60),m=minutes%60;return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  function renderPresentationDemo(){
+    var demoStart=450,demoEnd=660,conflictingIds={};
+    DEMO_CONFLICTS.forEach(function(conflict){conflict.flights.forEach(function(id){conflictingIds[id]=true;});});
+    document.getElementById('demo-flight-count').textContent=String(DEMO_FLIGHTS.length);
+    document.getElementById('demo-conflict-count').textContent=String(DEMO_CONFLICTS.length);
+    document.getElementById('demo-affected-count').textContent=String(Object.keys(conflictingIds).length);
+    document.getElementById('demo-conflict-list').innerHTML=DEMO_CONFLICTS.map(function(conflict){
+      var first=DEMO_FLIGHTS.find(function(flight){return flight.id===conflict.flights[0];});
+      var second=DEMO_FLIGHTS.find(function(flight){return flight.id===conflict.flights[1];});
+      var overlapStart=Math.max(first.start,second.start),overlapEnd=Math.min(first.end,second.end);
+      return '<div class="demo-conflict-card"><strong>Plans '+conflict.flights.join(' &amp; ')+' · '+esc(first.band)+' · '+minToTime(overlapStart)+'–'+minToTime(overlapEnd)+'</strong><p>'+esc(first.from+' → '+first.to)+' and '+esc(second.from+' → '+second.to)+'. '+esc(conflict.action)+'</p></div>';
+    }).join('');
+    document.getElementById('demo-plan-rows').innerHTML=DEMO_FLIGHTS.map(function(flight){
+      var hasConflict=Boolean(conflictingIds[flight.id]);
+      return '<tr><td class="demo-flight-id">'+esc(flight.id)+'</td><td>'+esc(flight.operator)+'<br><span class="notification-meta">'+esc(flight.payload)+'</span></td><td>'+esc(flight.from)+' → '+esc(flight.to)+'</td><td class="mono">'+minToTime(flight.start)+'–'+minToTime(flight.end)+'</td><td>'+esc(flight.band)+'</td><td><span class="demo-status'+(hasConflict?' conflict':'')+'">'+(hasConflict?'Review overlap':'Scheduled')+'</span></td></tr>';
+    }).join('');
+    var laneMarkup=BANDS.map(function(band){
+      var flights=DEMO_FLIGHTS.filter(function(flight){return flight.band===band;}).sort(function(a,b){return a.start-b.start;});
+      var slotEnds=[];
+      var bars=flights.map(function(flight){
+        var slot=slotEnds.findIndex(function(end){return end<=flight.start;});
+        if(slot<0){slot=slotEnds.length;slotEnds.push(flight.end);}else slotEnds[slot]=flight.end;
+        var left=(flight.start-demoStart)/(demoEnd-demoStart)*100;
+        var width=(flight.end-flight.start)/(demoEnd-demoStart)*100;
+        return '<div class="demo-bar'+(conflictingIds[flight.id]?' conflict':'')+'" style="left:'+left+'%;width:'+width+'%;top:'+(6+slot*25)+'px;height:20px" title="Plan '+esc(flight.id)+' · '+minToTime(flight.start)+'–'+minToTime(flight.end)+'">'+esc(flight.id)+' · '+minToTime(flight.start)+'</div>';
+      }).join('');
+      var trackHeight=Math.max(40,12+slotEnds.length*25);
+      return '<div class="demo-lane"><span class="demo-lane-label">'+band+'</span><div class="demo-lane-track" style="height:'+trackHeight+'px">'+bars+'</div></div>';
+    }).join('');
+    document.getElementById('demo-timeline').innerHTML=laneMarkup+'<div class="demo-axis"><span>07:30</span><span>08:00</span><span>08:30</span><span>09:00</span><span>09:30</span><span>10:00</span><span>10:30</span><span>11:00</span></div>';
+  }
   function newRequestId(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(char){var random=Math.random()*16|0;return (char==='x'?random:(random&3|8)).toString(16);});}
   function formatClock(value){var date=new Date(value);return date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
   function routesFromApi(routes){return routes.map(function(route){return Object.assign({},route,{start:route.startMin,end:route.endMin});});}
@@ -1045,6 +1179,23 @@
   function showToast(message,isConflict){var el=document.getElementById('toast');el.innerHTML='<span class="toast-dot"></span><span>'+esc(message)+'</span>';el.className='toast'+(isConflict?' conflict-toast':'');clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.className='toast hidden';},3400);}
   function setFlash(id){state.flashIds=[id];render();setTimeout(function(){state.flashIds=[];render();},2000);}
   function setSyncStatus(value){document.getElementById('sync-status').textContent=value;}
+  function setPresentationMode(enabled){
+    var demo=document.getElementById('presentation-demo'),button=document.getElementById('presentation-toggle-btn');
+    if(enabled&&document.body.classList.contains('profile-view'))closeProfilePage();
+    demo.hidden=!enabled;
+    document.body.classList.toggle('presentation-mode',enabled);
+    button.setAttribute('aria-expanded',String(enabled));
+    button.textContent=enabled?'Exit presentation':'Presentation demo';
+    if(enabled)renderPresentationDemo();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  document.getElementById('presentation-toggle-btn').addEventListener('click',function(){
+    setPresentationMode(document.getElementById('presentation-demo').hidden);
+  });
+  document.getElementById('presentation-exit-btn').addEventListener('click',function(){
+    setPresentationMode(false);
+    document.getElementById('presentation-toggle-btn').focus();
+  });
   var accountOverlay=document.getElementById('account-modal-overlay'),accountMode='login';
   function openAccountModal(mode){
     accountMode=mode||'login';
@@ -1240,7 +1391,19 @@
     var body={clientRequestId:newRequestId(),operator:document.getElementById('f-operator').value,ncaaId:document.getElementById('f-ncaa').value.trim(),from:document.getElementById('f-from').value,to:document.getElementById('f-to').value,payload:document.getElementById('f-payload').value,band:document.getElementById('f-band').value,flightDate:document.getElementById('f-date').value,waypoints:routeWaypoints,aircraftId:document.getElementById('f-aircraft').value||null,payloadDetails:document.getElementById('f-payload-details').value.trim(),batteryStartPercent:startBattery===''?null:Number(startBattery),batteryReservePercent:reserveBattery===''?null:Number(reserveBattery),contingencyPlan:document.getElementById('f-contingency').value.trim(),startMin:start,endMin:end};
     try{
       var result=await api('/api/corridors/'+encodeURIComponent(state.current)+'/flights',{method:'POST',body:JSON.stringify(body)});
-      closeModal();await loadCurrent();setFlash(result.flight._id);
+      closeModal();
+      var submittedFlight=routesFromApi([result.flight])[0];
+      state.routes=state.routes.filter(function(route){return route._id!==submittedFlight._id;});
+      state.routes.push(submittedFlight);
+      render();
+      try{await loadCurrent();}
+      catch(refreshError){
+        console.error('Flight plan was submitted, but the dashboard refresh failed:',refreshError);
+        setFlash(result.flight._id);
+        showToast('Flight plan submitted. The dashboard could not refresh; reload to update the schedule.',true);
+        return;
+      }
+      setFlash(result.flight._id);
       showToast(result.flight.isConflict?'Flight plan submitted — conflict detected on Route '+result.flight.id+'.':'Flight plan submitted — Route '+result.flight.id+' is clear.',result.flight.isConflict);
       setTimeout(function(){var row=document.querySelector('.route-row:last-child');if(row)row.scrollIntoView({behavior:'smooth',block:'center'});},60);
     }catch(error){
